@@ -1,4 +1,0 @@
-"""
-An example configuration file.
-
-"""
