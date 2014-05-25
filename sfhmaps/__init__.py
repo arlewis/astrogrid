@@ -18,6 +18,4 @@ Utilities for the sfh_maps project and paper.
 - tools for uniform formatting in figures
 
 """
-#from researchtools.sfhmaps.subpackage import thing
 from . import config
-from . import util
