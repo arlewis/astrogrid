@@ -30,6 +30,7 @@ PIXEL_LIST = np.arange(NROW*NCOL) + 1  # Each brick has NROW*NCOL pixels, IDd by
 # -----
 DATA_DIR = '/Users/Jake/Research/PHAT/sfhmaps/data'
 SFH_DIR = os.path.join(DATA_DIR, 'sfh')
+SFHPROC_DIR = os.path.join(DATA_DIR, 'proc')
 
 
 def _get_file_extpar(**kwargs):
@@ -78,9 +79,9 @@ def _get_file_cmd(**kwargs):
     return path_list
 
 
-def _get_file_zcb(**kwargs):
-    dirname = os.path.join(SFHPROC_DIR, 'b{0:02d}', 'zcb')
-    filename = 'b{0:02d}-{1:03d}.zcb'
+def _get_file_bestzcb(**kwargs):
+    dirname = os.path.join(SFHPROC_DIR, 'b{0:02d}', 'bestzcb')
+    filename = 'b{0:02d}-{1:03d}_best.zcb'
     pth = os.path.join(dirname, filename)
     path_list = [pth.format(brick, pixel) for brick, pixel in kwargs['brickpixel']]
     return path_list
@@ -172,12 +173,25 @@ def path(kind, **kwargs):
     extpar
         File with best-fit Av and dAv extinction parameters for all pixels
         in a brick.
-    phot, sfh, cmd, zcb
+    phot, sfh, cmd, bestzcb
         SFH-related files for a given pixel. They are produced by the
-        following procedure::
+        following procedure (kind names are in brackets)::
 
-          calcsfh (par) phot (fake) sfh -mcdata ...  # other output: cmd, (hmcdat)
-          zcombine sfh -bestonly > zcb
+          calcsfh par [phot] fake [sfh] -zinc -mcdata -dAvy=0 -dAv=dAv  # other output: [cmd], hmcdat
+          zcombine [sfh] -bestonly > [bestzcb]
+
+        .. note:: In case additional kinds are supported in the future,
+           should probably stick to a naming scheme similar to this::
+
+             hybridMC hmcdat [hmcsfh] -tint=2.0 -nmc=10000 -dt=0.015
+             zcombine -unweighted -medbest -jeffreys -best=[bestzcb] [hmcsfh] > [hmczcb]
+             zcmerge [bestzcb] [hmczcb] -absolute > [besthmczcb]
+
+             zcombine [extsyssfh]* > [extsyszcb]  # extinction systematics
+             zcmerge [bestzcb] [extsyszcb] -absolute > [bestextzcb]
+
+             zcombine [isosyssfh]* > [isosyszcb]  # isochrone systematics
+             zcmerge [bestzcb] [isosyszcb] -absolute > [bestisozcb]
 
     """
     brick = kwargs.get('brick')
@@ -193,7 +207,7 @@ def path(kind, **kwargs):
         brick = [brk for brk in brick if brk in BRICK_LIST]
         kwargs['brick'] = brick
 
-        if kind in ['phot', 'sfh', 'cmd', 'zcb']:
+        if kind in ['phot', 'sfh', 'cmd', 'bestzcb']:
             if pixel is None:
                 pixel = PIXEL_LIST
             elif not hasattr(pixel, '__iter__'):
@@ -216,7 +230,7 @@ def path(kind, **kwargs):
         'phot': _get_file_phot,
         'sfh': _get_file_sfh,
         'cmd': _get_file_cmd,
-        'zcb': _get_file_zcb,
+        'bestzcb': _get_file_bestzcb,
         }
 
     kwargs['kind'] = kind
