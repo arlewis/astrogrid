@@ -10,14 +10,6 @@ from . import config
 # Shell and misc.
 # ---------------
 
-def safe_symlink(src, dst):
-    """Create a symlink only if it does not already exist."""
-    try:
-        os.symlink(src, dst)
-    except OSError as exception:
-        if exception.errno != errno.EEXIST:
-            raise
-
 
 def is_string(obj):
     """Check if an object is a string rather than a list of strings.

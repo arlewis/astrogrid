@@ -284,16 +284,17 @@ def calc_flux(brick, pixel, sps, magfilter, attenuated=False):
 
 # Scripting
 # ---------
-def make_mean_sfr_100myr_brickmaps():
+def make_brickmaps_base(kind, func):
     for brick in config.BRICK_LIST:
-        hdu = make_image(brick, calc_mean_sfr)
-        mapfile = config.get_file(brick=brick, kind='mean_sfr_100myr')
+        hdu = make_image(brick, func)
+        mapfile = config.path(kind, brick=brick)
         dirname = os.path.dirname(mapfile)
         util.safe_mkdir(dirname)
         hdu.writeto(mapfile)
+    return None
 
 
-def make_mean_sfh_100myr_mosaic(cdelt=None):
+def make_mosaic_base(kind, work_dir, cdelt=None):
     """
     cdelt : float, optional
         Set the pixel scale (deg/pix) of the mosaic. If None, the mosaic of
@@ -302,7 +303,6 @@ def make_mean_sfh_100myr_mosaic(cdelt=None):
 
     """
     # Set up a working directory and subdirectories
-    work_dir = os.path.join(config.MAP_DIR, '_mean_sfr_100myr')
     input_dir = os.path.join(work_dir, 'input')
     proj_dir = os.path.join(work_dir, 'reproject')
     for path in (work_dir, input_dir, proj_dir):
@@ -310,7 +310,7 @@ def make_mean_sfh_100myr_mosaic(cdelt=None):
 
     # Symlink the input images
     for brick in config.BRICK_LIST:
-        mapfile = config.get_file(brick=brick, kind='mean_sfr_100myr')
+        mapfile = config.path(kind, brick=brick)
         filename = os.path.basename(mapfile)
         linkpath = os.path.join(input_dir, filename)
         util.safe_symlink(mapfile, linkpath)
@@ -332,84 +332,56 @@ def make_mean_sfh_100myr_mosaic(cdelt=None):
     montage.mImgtbl(proj_dir, metafile2, corners=True)
 
     # Build final mosaic
-    mosaicfile = config.get_file(brick='mosaic', kind='mean_sfr_100myr')
+    mosaicfile = config.path(kind, brick='all')
     montage.mAdd(metafile2, hdrfile, mosaicfile, img_dir=proj_dir, exact=True)
 
     return None
 
 
-def __old__make_mod_fuv_brickmaps(attenuated=False):
-    # wrap function based on `attenuated`
+def make_mean_sfr_100myr_brickmaps():
+    make_brickmaps_base('mean_sfr_100myr', calc_mean_sfr)
+    return None
+
+
+def make_mean_sfr_100myr_mosaic(cdelt=None):
+    work_dir = os.path.join(config.ANALYSIS_DIR, '_mean_sfr_100myr')
+    make_mosaic_base('mean_sfr_100myr', work_dir, cdelt=cdelt)
+    return None
+
+
+def __old__make_mod_fuv_brickmaps(reddened=False):
+    # wrap function based on `reddened`
     def func(brick, pixel):
-        return calc_flux(brick, pixel, 'galex_FUV', attenuated=attenuated)
+        return calc_flux(brick, pixel, 'galex_FUV', reddened=reddened)
 
-    if attenuated:
-        kind = 'mod_fuv_attenuated'
+    if reddened:
+        kind = 'mod_fuv_red'
     else:
-        kind = 'mod_fuv_intrinsic'
+        kind = 'mod_fuv'
 
-    for brick in config.BRICK_LIST:
-        hdu = make_image(brick, func)
-        mapfile = config.get_file(brick=brick, kind=kind)
-        dirname = os.path.dirname(mapfile)
-        util.safe_mkdir(dirname)
-        hdu.writeto(mapfile)
+    make_brickmaps_base(kind, func)
+    return None
 
 
-def __old__make_mod_fuv_mosaic(cdelt=None, attenuated=False):
+def __old__make_mod_fuv_mosaic(attenuated=False, cdelt=None):
     """
-    cdelt : float, optional
-        Set the pixel scale (deg/pix) of the mosaic. If None, the mosaic of
-        Alexia's pixel regions will have a pixel scale of 23.75 arcsec (in
-        both x and y).
-    attenuated : bool
-        If True, create a mosaic for attenuated FUV flux. Else make a
+    reddened : bool
+        If True, create a mosaic for reddened FUV flux. Else make a
         mosaic for intrinsic FUV flux (default).
 
     """
     if attenuated:
-        kind = 'mod_fuv_attenuated'
+        kind = 'mod_fuv_red'
     else:
-        kind = 'mod_fuv_intrinsic'
+        kind = 'mod_fuv'
 
-    # Set up a working directory and subdirectories
-    work_dir = os.path.join(config.MAP_DIR, '_{:s}'.format(kind))
-    input_dir = os.path.join(work_dir, 'input')
-    proj_dir = os.path.join(work_dir, 'reproject')
-    for path in (work_dir, input_dir, proj_dir):
-        util.safe_mkdir(path)
-
-    # Symlink the input images
-    for brick in config.BRICK_LIST:
-        mapfile = config.get_file(brick=brick, kind=kind)
-        filename = os.path.basename(mapfile)
-        linkpath = os.path.join(input_dir, filename)
-        util.safe_symlink(mapfile, linkpath)
-
-    # Metadata for input images
-    metafile1 = os.path.join(work_dir, 'input.tbl')
-    montage.mImgtbl(input_dir, metafile1, corners=True)
-
-    # Make a template header
-    hdrfile = os.path.join(work_dir, 'template.hdr')
-    hdr = montage.mMakeHdr(metafile1, hdrfile, cdelt=cdelt)
-
-    # Reproject to the template
-    statfile = os.path.join(work_dir, 'stats.tbl')
-    montage.mProjExec(metafile1, hdrfile, proj_dir, statfile, raw_dir=input_dir)
-
-    # Metadata for reprojected images
-    metafile2 = os.path.join(work_dir, 'reproject.tbl')
-    montage.mImgtbl(proj_dir, metafile2, corners=True)
-
-    # Build final mosaic
-    mosaicfile = config.get_file(brick='mosaic', kind=kind)
-    montage.mAdd(metafile2, hdrfile, mosaicfile, img_dir=proj_dir, exact=True)
-
+    work_dir = os.path.join(config.ANALYSIS_DIR, '_{:s}'.format(kind))
+    work_dir = config.path('{0:s}_montage_dir'.append(kind))
+    make_mosaic_base(kind, work_dir, cdelt=cdelt)
     return None
 
 
-def __old__make_mod_fuv_brickmaps(attenuated=False):
+def make_mod_fuv_brickmaps(attenuated=False):
     sps = fsps.StellarPopulation()
     sps.params['sfh'] = 0
     sps.params['sfh'] = 0
@@ -424,12 +396,8 @@ def __old__make_mod_fuv_brickmaps(attenuated=False):
     else:
         kind = 'mod_fuv_intrinsic'
 
-    for brick in config.BRICK_LIST:
-        hdu = make_image(brick, func)
-        mapfile = config.get_file(brick=brick, kind=kind)
-        dirname = os.path.dirname(mapfile)
-        util.safe_mkdir(dirname)
-        hdu.writeto(mapfile)
+    make_brickmaps_base(kind, func)
+    return None
 
 
 def make_galex_uv_mosaic(band):
@@ -446,17 +414,27 @@ def make_galex_uv_mosaic(band):
     for path in (work_dir, input_dir, proj_dir):
         util.safe_mkdir(path)
 
-    # Convert input image from cps to flux
-    dirname = '/Users/Jake/Research/Storage/M31/GALEX/DIS_mosaics/{:s}/nandir'.format(band.upper())
-    field_list = ['00', '07', '08', '09', '10']
-    for field in field_list:
-        filename = 'PS_M31_MOS{0:s}-{1:s}d-int_nan.fits'.format(field, band[0])
-        mapfile = os.path.join(dirname, filename)
+    # Prepare input images
+    for field in config.GALEX_FIELD_LIST:
+        filename = 'PS_M31_MOS{0:s}-{1:s}d-int.fits'.format(field, band[0])
+        mapfile = os.path.join(config.GALEX_DIR, filename)
         hdr = fits.getheader(mapfile)
         data = fits.getdata(mapfile)
-        data *= a
-        hdu = fits.PrimaryHDU(data, header=hdr)
+
+        # Set border pixels to NaN
+        x0, y0 = 1920, 1920
+        r = 1400
+        y, x = np.indices(data.shape)
+        incircle = (x+1)**2 + (y+1)**2 <= r**2
+        iszero = data == 0
+        data[-incircle & iszero] = np.nan
+
+        # Convert input image units from cps to flux
+        data = data * a
+
+        # Write image
         mapfile = os.path.join(input_dir, filename)
+        hdu = fits.PrimaryHDU(data, header=hdr)
         hdu.writeto(mapfile)
 
     # Metadata for input images
@@ -533,7 +511,7 @@ def make_galex_uv_brickmaps(band, clean=False):
 
 def main():
     #make_mean_sfr_100myr_brickmaps()
-    #make_mean_sfh_100myr_mosaic()
+    #make_mean_sfr_100myr_mosaic()
 
     #make_mod_fuv_brickmaps(attenuated=True)
     #make_mod_fuv_mosaic(attenuated=True)
