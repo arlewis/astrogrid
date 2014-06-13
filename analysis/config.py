@@ -2,21 +2,6 @@ import numpy as np
 import os
 
 
-def is_string(obj):
-    """Check if an object is a string rather than a list of strings.
-
-    Note that a slightly more straightforward test would be, ::
-
-      return hasattr(obj, '__iter__')
-
-    because lists and tuples have the __iter__ method while strings do not.
-    However, this will only work in Python 2.x as strings in Python 3 have
-    the __iter__ method.
-
-    """
-    return ''.join(obj) == obj
-
-
 
 # Brick pixel parameters
 # ----------------------
@@ -25,12 +10,16 @@ BRICK_LIST = np.r_[2, np.arange(4,24)]  # Bricks are IDd by integers
 PIXEL_LIST = np.arange(NROW*NCOL) + 1  # Each brick has NROW*NCOL pixels, IDd by integer
 
 
+# GALEX
+# -----
+GALEX_FIELD_LIST = ['00', '07', '08', '09', '10']
+
 
 # Paths
 # -----
-DATA_DIR = '/Users/Jake/Research/PHAT/sfhmaps/data'
-SFH_DIR = os.path.join(DATA_DIR, 'sfh')
-SFHPROC_DIR = os.path.join(DATA_DIR, 'proc')
+SFH_DIR = '/Users/Jake/Research/PHAT/sfhmaps/sfh'
+ANALYSIS_DIR = '/Users/Jake/Research/PHAT/sfhmaps/analysis'
+GALEX_DIR = '/Users/Jake/Research/Storage/M31/GALEX/DIS'
 
 
 def _get_file_extpar(**kwargs):
@@ -80,14 +69,14 @@ def _get_file_cmd(**kwargs):
 
 
 def _get_file_bestzcb(**kwargs):
-    dirname = os.path.join(SFHPROC_DIR, 'b{0:02d}', 'bestzcb')
+    dirname = os.path.join(ANALYSIS_DIR, 'b{0:02d}', 'bestzcb')
     filename = 'b{0:02d}-{1:03d}_best.zcb'
     pth = os.path.join(dirname, filename)
     path_list = [pth.format(brick, pixel) for brick, pixel in kwargs['brickpixel']]
     return path_list
 
 
-def _get_mosaic(kind, **kwargs):
+def _get_mosaic(**kwargs):
     brick_list = kwargs.get('brick')
     path_list = []
     if brick_list == 'full':
@@ -150,7 +139,7 @@ def path(kind, **kwargs):
         Return the file(s) of type `kind` for a brick or list of bricks.
         Whether a single file or a list of files is returned for a given
         brick depends on `pixel`. None (default) is equivalent to a list of
-        all bricks. 'full' returns a file for the combination of all
+        all bricks. 'all' returns a file for the combination of all
         bricks, e.g., a mosaic (pixels are irrelevant in this case). Valid
         uses of this keyword depend on `kind`.
     pixel : int, list of ints, optional
@@ -169,7 +158,7 @@ def path(kind, **kwargs):
     Values of the `kind` parameter:
 
     vert
-       File of RA,dec coordinates of the corners of all pixels in a brick.
+        File of RA,dec coordinates of the corners of all pixels in a brick.
     extpar
         File with best-fit Av and dAv extinction parameters for all pixels
         in a brick.
@@ -193,16 +182,30 @@ def path(kind, **kwargs):
              zcombine [isosyssfh]* > [isosyszcb]  # isochrone systematics
              zcmerge [bestzcb] [isosyszcb] -absolute > [bestisozcb]
 
+    galex fuv images (int maps)
+    ``'PS_M31_MOS{0:s}-{1:s}d-int.fits'.format(field, band[0])``
+
+    *_montage_dir
+        input
+            *.fits (symlinked or actual)
+        reproject
+            hdu0_*.fits
+            hdu0_*_area.fits
+        input.tbl
+        reproject.tbl
+        stats.tbl
+        template.hdr
+
     """
     brick = kwargs.get('brick')
     pixel = kwargs.get('pixel')
 
-    if brick == 'full' and kind not in []:
+    if brick == 'all' and kind not in []:
         kwargs['brick'] = []
     else:
         if brick is None:
             brick = BRICK_LIST
-        elif not hasattr(brick, '__iter__'):
+        elif not (hasattr(brick, '__iter__') or hasattr(brick, '__getitem__')):
             brick = [brick]  # convert to list
         brick = [brk for brk in brick if brk in BRICK_LIST]
         kwargs['brick'] = brick
@@ -210,18 +213,16 @@ def path(kind, **kwargs):
         if kind in ['phot', 'sfh', 'cmd', 'bestzcb']:
             if pixel is None:
                 pixel = PIXEL_LIST
-            elif not hasattr(pixel, '__iter__'):
+            elif not (hasattr(pixel, '__iter__') or hasattr(pixel, '__getitem__')):
                 pixel = [pixel]  # convert to list
             pixel = [pix for pix in pixel if pix in PIXEL_LIST]
             kwargs['pixel'] = pixel
 
             # list of brick,pixel pairs
-            brickpixel_list = []
-            for brick in kwargs['brick']:
-                for pixel in kwargs['pixel']:
-                    if (brick, pixel) in MISSING:
-                        continue
-                    brickpixel_list.append((brick, pixel))
+            brickpixel_list = [(brick, pixel)
+                               for brick in kwargs['brick']
+                               for pixel in kwargs['pixel']
+                               if (brick, pixel) not in MISSING]
             kwargs['brickpixel'] = brickpixel_list
 
     kind_dict = {
@@ -246,7 +247,7 @@ def path(kind, **kwargs):
 
 
 
-def old_stuff():
+def __old_stuff():
     # Brick pixel parameters
     # ----------------------
     BIDX = {brick: idx for idx, brick in enumerate(BRICK_LIST)}
