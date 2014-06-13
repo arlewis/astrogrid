@@ -182,8 +182,8 @@ def path(kind, **kwargs):
              zcombine [isosyssfh]* > [isosyszcb]  # isochrone systematics
              zcmerge [bestzcb] [isosyszcb] -absolute > [bestisozcb]
 
-    TODO:
-    GALEX images (e.g., ``'PS_M31_MOS{0:s}-{1:s}d-int.fits'.format(field, band[0])``)
+    galex fuv images (int maps)
+    ``'PS_M31_MOS{0:s}-{1:s}d-int.fits'.format(field, band[0])``
 
     *_montage_dir
         input
