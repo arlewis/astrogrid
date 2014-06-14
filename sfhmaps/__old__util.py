@@ -398,15 +398,17 @@ def world2pix(a, d, hdr):
 def gcdist(lon1, lat1, lon2, lat2, deg=True):
     """Calculate the great circle distance between two points."""
     if deg:
-        lon1 *= np.pi / 180
-        lat1 *= np.pi / 180
-        lon2 *= np.pi / 180
-        lat2 *= np.pi / 180
+        lon1 = lon1 * np.pi / 180
+        lat1 = lat1 * np.pi / 180
+        lon2 = lon2 * np.pi / 180
+        lat2 = lat2 * np.pi / 180
 
     dlon = lon2 - lon1
     dlat = lat2 - lat1
-    l = 2 * np.arcsin(np.sqrt(
-            np.sin(dlat/2)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(dlon/2)**2))
+    haversine_lat = np.sin(dlat/2)**2
+    haversine_lon = np.sin(dlon/2)**2
+    haversine_l = haversine_lat + np.cos(lat1)*np.cos(lat2)*haversine_lon
+    l = 2 * np.arcsin(np.sqrt(haversine_l))
     if deg:
         l *= 180 / np.pi
 
@@ -417,18 +419,19 @@ def sparea(lon, lat, R=1, units='deg'):
     """Calculate the area of a spherical polygon.
 
     It is assumed that the polygon contains no poles! The method is adapted
-    from,
-
-    http://trs-new.jpl.nasa.gov/dspace/bitstream/2014/40409/1/07-03.pdf
+    from "Some algorithms for polygons on a sphere" by Chamberlain and
+    Duquette (http://trs-new.jpl.nasa.gov/dspace/handle/2014/40409)
 
     Parameters
     ----------
-    lon, lat : 1D array
-        Lists or arrays of longitudes and latitudes of the polygon vertices.
+    lon, lat : array-like
+        Longitude and latitude of each vertex in the polygon. The first
+        vertex may be listed either only at the beginning of the sequence,
+        or both at the beginning and at the end of the sequence.
     R : float, optional
         Radius of the sphere (default is 1).
     units : {'deg', 'rad'}, optional
-        Sets the unit system for ``lon`` and ``lat``.
+        Sets the unit system for `lon` and `lat`.
 
     Returns
     -------
@@ -437,8 +440,13 @@ def sparea(lon, lat, R=1, units='deg'):
 
     """
     lon, lat = np.array(lon), np.array(lat)
+
+    # Ensure the polygon is closed
+    if not lon[-1]==lon[0] or not lat[-1]==lat[0]:
+        lon, lat = np.append(lon, lon[0]), np.append(lat, lat[0])
+
     if units == 'deg':
-        lon, lat = np.pi / 180 * lon, np.pi / 180 * lat
+        lon, lat = lon * np.pi / 180, lat * np.pi / 180
 
     # Great circle segments between vertices
     l = gcdist(lon[:-1], lat[:-1], lon[1:], lat[1:], deg=False)
@@ -451,18 +459,18 @@ def sparea(lon, lat, R=1, units='deg'):
     # that); assume that any negative values are within machine precision
     # of 0.
     term1 = (s - (np.pi / 2 + lat[:-1])) /2
-    term1b = np.where(term1 < 0, 0, term1)
+    term1[term1<0] = 0
     term2 = (s - (np.pi / 2 + lat[1:])) /2
-    term2b = np.where(term2 < 0, 0, term2)
-    E = 4 * np.arctan(np.sqrt(
-            np.tan(s/2) * np.tan((s-l)/2) * np.tan(term1b) * np.tan(term2b)))
+    term2[term2<0] = 0
+    result = np.tan(s/2) * np.tan((s-l)/2) * np.tan(term1) * np.tan(term2)
+    E = 4 * np.arctan(np.sqrt(result))
 
-    # Let A<0 for lon_i+1>lon_i, A>0 for lon_i+1<lon_i assuming ccw
+    # Let A<0 for lon[i]<lon[i+1], A>0 for lon[i+1]<lon[i] assuming ccw
     # traversal
-    sign = (lon[1:] < lon[:-1]) * 2 - 1
+    sign = 2*(lon[1:] < lon[:-1]) - 1
 
     # Total area
-    A = np.sum(E * sign) * R**2
+    A = np.sum(sign * E) * R**2
     if units == 'deg':
         A = A * (180 / np.pi)**2
     if A < 0:  # Fix the sign in case the vertices are not listed ccw
@@ -470,18 +478,35 @@ def sparea(lon, lat, R=1, units='deg'):
     return A
 
 
-def calc_pixscale(hdr):
+def calc_pixscale(hdr, ref='crpix'):
     """Calculate the pixel scale from the WCS information in a header.
 
     World coordinates are assumed to be in deg (e.g., CRVAL1 and CRVAL2).
     The pixel scales are returned in arcsec/pixel.
 
+    ref : {'crpix', 'central', tuple}, optional
+        The reference pixel is set to CRPIX1,CRPIX2 if 'crpix' (default).
+        'central' indicates that the central pixel in the image should be
+        used. An x,y tuple of floats may be given to instead use a specific
+        reference pixel.
+
     """
     hwcs = wcs.WCS(hdr)
-    xy = np.array([[hdr['crpix1']+1, hdr['crpix2']],
-                   [hdr['crpix1'], hdr['crpix2']+1]])
 
-    ad0 = hdr['crval1'], hdr['crval2']
+    if ref == 'crpix':
+        x0, y0 = hdr['crpix1'], hdr['crpix2']
+        ad0 = hdr['crval1'], hdr['crval2']
+    elif ref == 'central':
+        x0, y0 = hdr['naxis1']/2, hdr['naxis2']/2
+        a0, d0 = hwcs.wcs_pix2world(x0, y0, 1)
+        ad0 = [a0, d0]
+    else:
+        x0, y0 = ref
+        a0, d0 = hwcs.wcs_pix2world(x0, y0, 1)
+        ad0 = [a0, d0]
+
+    xy = np.array([[x0+1, y0], [x0, y0+1]])
+
     ad = hwcs.wcs_pix2world(xy, 1)
 
     scale1 = gcdist(ad0[0], ad0[1], ad[0,0], ad[0,1], deg=True) * 3600
