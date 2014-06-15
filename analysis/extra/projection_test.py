@@ -174,11 +174,12 @@ def calc_area3(hdr, ref='crpix'):
 
 
 def print_summary(f):
-    print np.all(f > 0)
-    print np.median(f)
-    print np.mean(f)
-    print np.std(f)
-    print np.min(f), np.max(f)
+    output = ('      median = {0:.2e}\n'
+              'mean +/- std = {1:.2e} +/- {2:.2e}\n'
+              '    min, max = {3:.2e}, {4:.2e}\n'
+              .format(np.median(f), np.mean(f), np.std(f), np.min(f), np.max(f))
+              )
+    print output
     return None
 
 
@@ -188,36 +189,34 @@ def sum_test():
                   14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
     data_nat, data_rep = [], []  # brick native, brick reprojected
-    hdr_nat, hdr_rep = [], []
-    area_nat, area_rep = [], []
     for brick in brick_list:
         # Native, unprojected image
         filename = 'b{:02d}_mod_fuv_attenuated.fits'.format(brick)
         filename = os.path.join(work_dir, 'b{:02d}'.format(brick), filename)
-        data_nat.append(fits.getdata(filename))
+        data = fits.getdata(filename)
+
         hdr = fits.getheader(filename)
-        hdr_nat.append(hdr)
-        area_nat.append(calc_area3(hdr, ref='central'))
+        hwcs = wcs.WCS(hdr)
+        #area = calc_area1(data, hwcs)
+        area = calc_area3(hdr, ref='central')
+        data_nat.append(data * area)
 
         # Reprojected image
         filename = 'hdu0_b{:02d}_mod_fuv_attenuated.fits'.format(brick)
         filename = os.path.join(work_dir, '_mod_fuv_attenuated', 'reproject', filename)
-        data_rep.append(fits.getdata(filename))
-        hdr = fits.getheader(filename)
-        hdr_rep.append(hdr)
-        area_rep.append(calc_area3(hdr, ref='central'))
-   
+        data = fits.getdata(filename)
+
+        filename = 'hdu0_b{:02d}_mod_fuv_attenuated_area.fits'.format(brick)
+        filename = os.path.join(work_dir, '_mod_fuv_attenuated', 'reproject', filename)
+        area_rep = fits.getdata(filename) * (180/np.pi*3600)**2  # arcsec2
+        data_rep.append(data * area_rep)
+
     sum_nat = np.array([np.nansum(arr) for arr in data_nat])
-    sum_rep1 = np.array([np.nansum(arr) for arr in data_rep])
+    sum_rep = np.array([np.nansum(arr) for arr in data_rep])
 
-    area_nat, area_rep = np.array(area_nat), np.array(area_rep)
-    sum_rep2 = sum_rep1 * area_rep / area_nat
+    fractionaldiff = (sum_rep - sum_nat) / sum_nat
 
-    fdiff1 = (sum_rep1 - sum_nat) / sum_nat
-    fdiff2 = (sum_rep2 - sum_nat) / sum_nat
-
-    print_summary(fdiff1)
-    print_summary(fdiff2)
+    print_summary(fractionaldiff)
 
 
 if __name__ == '__main__':
@@ -225,46 +224,36 @@ if __name__ == '__main__':
 
 
 """
-fdiff1:
-True
-0.256000952968
-0.268789104698
-0.0683292021485
-0.175081717765 0.401284164275
+Results
+=======
 
-fdiff2:
-True
-0.0979553435366
-0.117646011686
-0.0615039172599
-0.032729357065 0.24221690624
+Fractional differences for 21 bricks; each difference is between the pixel
+sums of the native and the reprojected images of a brick. Reprojection
+preserves flux to within ~0.01% at worst, ~0.001% on average:
 
-* There is a flux discrepancy -- reprojected images are always brighter
-  than the input images. Multiplying by pixel area ratios (absolute
-  conservation vs. density conservation) helps some, but there is still a
-  large mean discrapancy.
-* The flux discrepancy is variable -- bricks 11 and 23 have especially large
-  flux discrepancies, even after area considerations.
+        median = 2.47e-05
+  mean +/- std = 3.27e-05 +/- 9.69e-05
+      min, max = -3.47e-04, 1.71e-04
 
 
+Notes
+=====
+- mProjExec and mProject produce nearly identical results (within ~0.01%).
 
+- Settings that affect reprojection: mProject has the 'z' flag, which
+  controls the drizzle factor. 1 seems to be the default, and appears to
+  give the best results anyway so there is no reason to change it.
+  mProjExec doesn't really have any settings that change the reprojection
+  results.
 
-mProjExec and mProject produce very similar results (within ~0.01%).
+- Pixel area varies slightly accross brick 15 in both the native and the
+  reprojected images. The effect causes only ~0.001% difference between the
+  minimum and maximum areas, however, so the pixels can be safely treated
+  as having constant area.
 
-mProjExec doesn't really have any settings that change the results.
-mProject has the 'z' flag, which controls the drizzle factor. It seems that
-values less than 1 give crummy-looking results and values greater than 1
-are smoothed. The default seems to be 1, which is the best setting anyway.
-There are otherwise no settings that change the results.
-
-Pixel area varies slightly accross brick 15, ~a thousandth of a percent
-between the minimum value on one side of the image and the maximum value on
-the other (this is true for both the native and reprojected images). Might
-as well just use a single area value for all pixels.
-
-All three area calculation methods agree to within ~a hundredth to a
-thousandth of a percent. Might as well just use the simplest method, which
-is the single area value calculated from the pixel scale in the FITS
-header.
+- All three area calculation methods (`calc_area1`, `calc_area2`,
+  `calc_area3`) agree to within ~0.01% to ~0.001%. Might as well just use
+  the simplest method, which is the single area value calculated from the
+  pixel scale in the FITS header.
 
 """
