@@ -3,23 +3,36 @@ import os
 
 
 
+
+
 # Brick pixel parameters
-# ----------------------
+# ======================
 NROW, NCOL = 15, 30  # Bricks are divided into grids NROW rows by NCOL columns
 BRICK_LIST = np.r_[2, np.arange(4,24)]  # Bricks are IDd by integers
 PIXEL_LIST = np.arange(NROW*NCOL) + 1  # Each brick has NROW*NCOL pixels, IDd by integer
 
 
+
+
+
 # GALEX
-# -----
+# =====
 GALEX_FIELD_LIST = ['00', '07', '08', '09', '10']
 
 
+
+
+
 # Paths
-# -----
+# =====
 SFH_DIR = '/Users/Jake/Research/PHAT/sfhmaps/sfh'
 ANALYSIS_DIR = '/Users/Jake/Research/PHAT/sfhmaps/analysis'
 GALEX_DIR = '/Users/Jake/Research/Storage/M31/GALEX/DIS'
+
+
+
+# SFH data
+# --------
 
 
 def _get_file_extpar(**kwargs):
@@ -28,6 +41,26 @@ def _get_file_extpar(**kwargs):
     pth = os.path.join(dirname, filename)
     path_list = [pth.format(brick) for brick in kwargs['brick']]
     return path_list
+
+
+def _parse_extparfile():
+    """Load pixel Av and dAv extinction parameters for all bricks into an
+    array (rows are bricks, columns are pixels). This is required for some
+    filenames.
+
+    """
+    av_arr = np.zeros((BRICK_LIST.size, PIXEL_LIST.size))
+    dav_arr = np.zeros((BRICK_LIST.size, PIXEL_LIST.size))
+    for i, brick in enumerate(BRICK_LIST):
+        extparfile = _get_file_extpar(brick=[brick])[0]
+
+        with open(extparfile, 'r') as f:
+            for j, line in enumerate(f):
+                av, dav = line.split()[1:3]
+                av_arr[i,j], dav_arr[i,j] = float(av), float(dav)
+
+    return av_arr, dav_arr
+AV, DAV = _parse_extparfile()
 
 
 def _get_file_vert(**kwargs):
@@ -76,37 +109,6 @@ def _get_file_bestzcb(**kwargs):
     return path_list
 
 
-def _get_mosaic(**kwargs):
-    brick_list = kwargs.get('brick')
-    path_list = []
-    if brick_list == 'full':
-        pass  # path_list.append(mosaic_file)
-    else:
-        for brick in brick_list:
-            pass  # path_list.append(brick_file)
-    return path_list
-
-
-def _parse_extparfile():
-    """Load pixel Av and dAv extinction parameters for all bricks into an
-    array (rows are bricks, columns are pixels). This is required for some
-    filenames.
-
-    """
-    av_arr = np.zeros((BRICK_LIST.size, PIXEL_LIST.size))
-    dav_arr = np.zeros((BRICK_LIST.size, PIXEL_LIST.size))
-    for i, brick in enumerate(BRICK_LIST):
-        extparfile = _get_file_extpar(brick=[brick])[0]
-
-        with open(extparfile, 'r') as f:
-            for j, line in enumerate(f):
-                av, dav = line.split()[1:3]
-                av_arr[i,j], dav_arr[i,j] = float(av), float(dav)
-
-    return av_arr, dav_arr
-AV, DAV = _parse_extparfile()
-
-
 def _find_missing():
     """Find all brick,pixel pairs for which no data are available."""
     missing = []
@@ -126,6 +128,385 @@ def _find_missing():
 
     return missing
 MISSING = _find_missing()
+
+
+
+# Images and mosaics
+# ------------------
+
+
+# mod_fuv_int
+# ```````````
+def _get_file_mod_fuv_int(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'mod_fuv_int.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(ANALYSIS_DIR, 'b{0:02d}')
+        filename = 'b{0:02d}_mod_fuv_int.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_int_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_mod_fuv_int')]
+    return path_list
+
+
+def _get_file_mod_fuv_int_density(**kwargs):
+    dirname = os.path.join(_get_file_mod_fuv_int_montage()[0], 'input')
+    filename = 'b{0:02d}_mod_fuv_int_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_int_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_fuv_int_montage()[0], 'add')
+        filename = 'mod_fuv_int_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_fuv_int_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_fuv_int_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_int_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_fuv_int_montage()[0], 'add')
+        filename = 'mod_fuv_int_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_fuv_int_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_fuv_int_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_int_templatehdr(**kwargs):
+    dirname = _get_file_mod_fuv_int_montage()[0]
+    filename = 'template.hdr'
+    path_list = [os.path.join(dirname, filename)]
+    return path_list
+
+
+# mod_fuv_red
+# ```````````
+def _get_file_mod_fuv_red(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'mod_fuv_red.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(ANALYSIS_DIR, 'b{0:02d}')
+        filename = 'b{0:02d}_mod_fuv_red.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_red_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_mod_fuv_red')]
+    return path_list
+
+
+def _get_file_mod_fuv_red_density(**kwargs):
+    dirname = os.path.join(_get_file_mod_fuv_red_montage()[0], 'input')
+    filename = 'b{0:02d}_mod_fuv_red_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_red_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_fuv_red_montage()[0], 'add')
+        filename = 'mod_fuv_red_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_fuv_red_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_fuv_red_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_red_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_fuv_red_montage()[0], 'add')
+        filename = 'mod_fuv_red_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_fuv_red_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_fuv_red_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_fuv_red_templatehdr(**kwargs):
+    return _get_file_mod_fuv_int_templatehdr()
+
+
+# galex_fuv
+# `````````
+def _get_file_galex_fuv(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'galex_fuv.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = GALEX_DIR
+        filename = 'PS_M31_MOS{0:02d}-fd-int.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_fuv_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_galex_fuv')]
+    return path_list
+
+
+def _get_file_galex_fuv_density(**kwargs):
+    dirname = os.path.join(_get_file_galex_fuv_montage()[0], 'input')
+    filename = 'MOS{0:02d}_galex_fuv_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_fuv_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_galex_fuv_montage()[0], 'add')
+        filename = 'galex_fuv_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_galex_fuv_montage()[0], 'reproject')
+        filename = 'hdu0_MOS{0:02d}_galex_fuv_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_fuv_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_galex_fuv_montage()[0], 'add')
+        filename = 'galex_fuv_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_galex_fuv_montage()[0], 'reproject')
+        filename = 'hdu0_MOS{0:02d}_galex_fuv_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_fuv_templatehdr(**kwargs):
+    return _get_file_mod_fuv_int_templatehdr()
+
+
+# mod_nuv_int
+# ```````````
+def _get_file_mod_nuv_int(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'mod_nuv_int.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(ANALYSIS_DIR, 'b{0:02d}')
+        filename = 'b{0:02d}_mod_nuv_int.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_int_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_mod_nuv_int')]
+    return path_list
+
+
+def _get_file_mod_nuv_int_density(**kwargs):
+    dirname = os.path.join(_get_file_mod_nuv_int_montage()[0], 'input')
+    filename = 'b{0:02d}_mod_nuv_int_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_int_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_nuv_int_montage()[0], 'add')
+        filename = 'mod_nuv_int_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_nuv_int_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_nuv_int_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_int_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_nuv_int_montage()[0], 'add')
+        filename = 'mod_nuv_int_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_nuv_int_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_nuv_int_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_int_templatehdr(**kwargs):
+    return _get_file_mod_fuv_int_templatehdr()
+
+
+# mod_nuv_red
+# ```````````
+def _get_file_mod_nuv_red(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'mod_nuv_red.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(ANALYSIS_DIR, 'b{0:02d}')
+        filename = 'b{0:02d}_mod_nuv_red.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_red_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_mod_nuv_red')]
+    return path_list
+
+
+def _get_file_mod_nuv_red_density(**kwargs):
+    dirname = os.path.join(_get_file_mod_nuv_red_montage()[0], 'input')
+    filename = 'b{0:02d}_mod_nuv_red_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_red_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_nuv_red_montage()[0], 'add')
+        filename = 'mod_nuv_red_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_nuv_red_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_nuv_red_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_red_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_mod_nuv_red_montage()[0], 'add')
+        filename = 'mod_nuv_red_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_mod_nuv_red_montage()[0], 'reproject')
+        filename = 'hdu0_b{0:02d}_mod_nuv_red_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_mod_nuv_red_templatehdr(**kwargs):
+    return _get_file_mod_fuv_int_templatehdr()
+
+
+# galex_nuv
+# `````````
+def _get_file_galex_nuv(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = ANALYSIS_DIR
+        filename = 'galex_nuv.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = GALEX_DIR
+        filename = 'PS_M31_MOS{0:02d}-fd-int.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_nuv_montage(**kwargs):
+    path_list = [os.path.join(ANALYSIS_DIR, '_galex_nuv')]
+    return path_list
+
+
+def _get_file_galex_nuv_density(**kwargs):
+    dirname = os.path.join(_get_file_galex_nuv_montage()[0], 'input')
+    filename = 'MOS{0:02d}_galex_nuv_density.fits'
+    pth = os.path.join(dirname, filename)
+    path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_nuv_reproject(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_galex_nuv_montage()[0], 'add')
+        filename = 'galex_nuv_density.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_galex_nuv_montage()[0], 'reproject')
+        filename = 'hdu0_MOS{0:02d}_galex_nuv_density.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_nuv_reproject_area(**kwargs):
+    brick_list = kwargs['brick']
+    if brick_list == 'all':
+        dirname = os.path.join(_get_file_galex_nuv_montage()[0], 'add')
+        filename = 'galex_nuv_density_area.fits'
+        path_list = [os.path.join(dirname, filename)]
+    else:
+        dirname = os.path.join(_get_file_galex_nuv_montage()[0], 'reproject')
+        filename = 'hdu0_MOS{0:02d}_galex_nuv_density_area.fits'
+        pth = os.path.join(dirname, filename)
+        path_list = [pth.format(brick) for brick in kwargs['brick']]
+    return path_list
+
+
+def _get_file_galex_nuv_templatehdr(**kwargs):
+    return _get_file_mod_fuv_int_templatehdr()
+
+
+
+# Main path function
+# ------------------
 
 
 def path(kind, **kwargs):
@@ -155,7 +536,11 @@ def path(kind, **kwargs):
 
     Notes
     -----
-    Values of the `kind` parameter:
+    There are many possible values for the `kind` parameter. Here they are,
+    organized by categroy:
+
+    SFH data
+    ````````
 
     vert
         File of RA,dec coordinates of the corners of all pixels in a brick.
@@ -182,32 +567,55 @@ def path(kind, **kwargs):
              zcombine [isosyssfh]* > [isosyszcb]  # isochrone systematics
              zcmerge [bestzcb] [isosyszcb] -absolute > [bestisozcb]
 
-    galex fuv images (int maps)
-    ``'PS_M31_MOS{0:s}-{1:s}d-int.fits'.format(field, band[0])``
+    Images and mosaics
+    ``````````````````
+    The kinds below use `<band>` to represent any of the following:
 
-    *_montage_dir
-        input
-            *.fits (symlinked or actual)
-        reproject
-            hdu0_*.fits
-            hdu0_*_area.fits
-        input.tbl
-        reproject.tbl
-        stats.tbl
-        template.hdr
+    mod_fuv_int
+        Modeled intrinsic FUV flux.
+    mod_fuv_red
+        Modeled reddened FUV flux.
+    galex_fuv
+        Observed FUV flux from GALEX.
+    mod_nuv_int
+        Modeled intrinsic NUV flux.
+    mod_nuv_red
+        Modeled reddened NUV flux.
+    galex_nuv
+        Observed NUV flux from GALEX.
+
+    <band>
+        A map. `brick` may be an integer to select individual brick maps,
+        or 'all' for the mosaic.
+    <band>_montage
+        The Montage working directory for <band>.
+    <band>_density
+        A density map (signal per unit pixel area). `brick` may be int or
+        'all'. This is the image that gets reprojected by Montage.
+    <band>_reproject, <band>_reproject_area
+        Reprojected density map and corresponding area map. `brick` may be
+        int or 'all'.
+    <band>_templatehdr
+        The WCS header template used for reprojection.
 
     """
     brick = kwargs.get('brick')
     pixel = kwargs.get('pixel')
 
-    if brick == 'all' and kind not in []:
+    # Special handling of non-PHAT data
+    if kind in ['galex_fuv', 'galex_nuv']:
+        brick_list = GALEX_FIELD_LIST
+    else:
+        brick_list = BRICK_LIST
+
+    if brick == 'all':
         kwargs['brick'] = []
     else:
         if brick is None:
-            brick = BRICK_LIST
+            brick = brick_list
         elif not (hasattr(brick, '__iter__') or hasattr(brick, '__getitem__')):
             brick = [brick]  # convert to list
-        brick = [brk for brk in brick if brk in BRICK_LIST]
+        brick = [brk for brk in brick if brk in brick_list]
         kwargs['brick'] = brick
 
         if kind in ['phot', 'sfh', 'cmd', 'bestzcb']:
@@ -232,6 +640,48 @@ def path(kind, **kwargs):
         'sfh': _get_file_sfh,
         'cmd': _get_file_cmd,
         'bestzcb': _get_file_bestzcb,
+
+        'mod_fuv_int': _get_file_mod_fuv_int,
+        'mod_fuv_int_montage': _get_file_mod_fuv_int_montage,
+        'mod_fuv_int_density': _get_file_mod_fuv_int_density,
+        'mod_fuv_int_reproject': _get_file_mod_fuv_int_reproject,
+        'mod_fuv_int_reproject_area': _get_file_mod_fuv_int_reproject_area,
+        'mod_fuv_int_templatehdr': _get_file_mod_fuv_int_templatehdr,
+
+        'mod_fuv_red': _get_file_mod_fuv_red,
+        'mod_fuv_red_montage': _get_file_mod_fuv_red_montage,
+        'mod_fuv_red_density': _get_file_mod_fuv_red_density,
+        'mod_fuv_red_reproject': _get_file_mod_fuv_red_reproject,
+        'mod_fuv_red_reproject_area': _get_file_mod_fuv_red_reproject_area,
+        'mod_fuv_red_templatehdr': _get_file_mod_fuv_red_templatehdr,
+
+        'galex_fuv': _get_file_galex_fuv,
+        'galex_fuv_montage': _get_file_galex_fuv_montage,
+        'galex_fuv_density': _get_file_galex_fuv_density,
+        'galex_fuv_reproject': _get_file_galex_fuv_reproject,
+        'galex_fuv_reproject_area': _get_file_galex_fuv_reproject_area,
+        'galex_fuv_templatehdr': _get_file_galex_fuv_templatehdr,
+
+        'mod_nuv_int': _get_file_mod_nuv_int,
+        'mod_nuv_int_montage': _get_file_mod_nuv_int_montage,
+        'mod_nuv_int_density': _get_file_mod_nuv_int_density,
+        'mod_nuv_int_reproject': _get_file_mod_nuv_int_reproject,
+        'mod_nuv_int_reproject_area': _get_file_mod_nuv_int_reproject_area,
+        'mod_nuv_int_templatehdr': _get_file_mod_nuv_int_templatehdr,
+
+        'mod_nuv_red': _get_file_mod_nuv_red,
+        'mod_nuv_red_montage': _get_file_mod_nuv_red_montage,
+        'mod_nuv_red_density': _get_file_mod_nuv_red_density,
+        'mod_nuv_red_reproject': _get_file_mod_nuv_red_reproject,
+        'mod_nuv_red_reproject_area': _get_file_mod_nuv_red_reproject_area,
+        'mod_nuv_red_templatehdr': _get_file_mod_nuv_red_templatehdr,
+
+        'galex_nuv': _get_file_galex_nuv,
+        'galex_nuv_montage': _get_file_galex_nuv_montage,
+        'galex_nuv_density': _get_file_galex_nuv_density,
+        'galex_nuv_reproject': _get_file_galex_nuv_reproject,
+        'galex_nuv_reproject_area': _get_file_galex_nuv_reproject_area,
+        'galex_nuv_templatehdr': _get_file_galex_nuv_templatehdr,
         }
 
     kwargs['kind'] = kind
@@ -244,6 +694,8 @@ def path(kind, **kwargs):
         path_list = path_list[0]
 
     return path_list
+
+
 
 
 
