@@ -3,7 +3,6 @@ Process calcsfh output files using zcombine.
 
 """
 import os
-
 import match_wrapper as match
 from sfhmaps import config, util
 

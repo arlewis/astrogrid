@@ -1,11 +1,7 @@
 from astropy.io import fits
-import attenuation, observate  # from sedpy
-import bursty_sfh as bsp, sfhutils as utils  # scombine
-import fsps
 import montage_wrapper as montage
 import numpy as np
 import os
-import scombine
 import subprocess
 
 from sfhmaps import config, util
@@ -253,10 +249,21 @@ def __old__calc_flux(brick, pixel, magfilter, attenuated=False):
     return flux
 
 
+
+sp_params = {
+    'compute_vega_mags': False,
+    'imf_type': 2,
+    'zmet': 20,
+    'sfh': 0}
+
+
+
+
+
 def calc_flux(brick, pixel, sps, magfilter, attenuated=False):
     """Calculate flux in magfilter for the given pixel."""
     if attenuated:
-        bidx, pidx = config.BIDX[brick],config.PIDX[pixel]
+        bidx, pidx = config.BRICK_LIST==brick, config.PIXEL_LIST==pixel
         av, dav = config.AV[bidx, pidx], config.DAV[bidx, pidx]
     else:
         av, dav = 0, 0
@@ -847,4 +854,26 @@ Use the same input WCS header to create a corresponding GALEX FUV map.
   interest?
 
 """
+
+
+
+import match_wrapper as match
+from sfhmaps import flux
+
+zcbfile = '/Users/Jake/Research/PHAT/sfhmaps/analysis/b15/bestzcb/b15-001_best.zcb'
+sfh = match.io.open_zcbfile(zcbfile)
+sfh['age_i'] = 10**sfh['log(age_i)']  # Linearize ages
+sfh['age_f'] = 10**sfh['log(age_f)']
+sfh['SFR'][0] *= 1 - sfh['age_i'][0]/sfh['age_f'][0]  # Rescale 1st age bin
+sfh['age_i'][0] = 0
+age, sfr = (sfh['age_i'], sfh['age_f']), sfh['SFR']
+
+fsps_kwargs = {
+    'compute_vega_mags': False,
+    'imf_type': 2,
+    'zmet': flux.get_zmet(sfh['[M/H]'][sfh['SFR']>0][0]),
+    'sfh': 0
+    }
+
+wave, spec = flux.calc_sed(sfr, age, fsps_kwargs=fsps_kwargs)
 

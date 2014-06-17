@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from sfhmaps import util
 
 
 
@@ -318,7 +319,7 @@ def path(kind, **kwargs):
     else:
         if brick is None:
             brick = brick_list
-        elif not (hasattr(brick, '__iter__') or hasattr(brick, '__getitem__')):
+        elif not util.islistlike(brick):
             brick = [brick]  # convert to list
         brick = [brk for brk in brick if brk in brick_list]
         kwargs['brick'] = brick
@@ -326,7 +327,7 @@ def path(kind, **kwargs):
         if kind in ['phot', 'sfh', 'cmd', 'bestzcb']:
             if pixel is None:
                 pixel = PIXEL_LIST
-            elif not (hasattr(pixel, '__iter__') or hasattr(pixel, '__getitem__')):
+            elif not util.islistlike(pixel):
                 pixel = [pixel]  # convert to list
             pixel = [pix for pix in pixel if pix in PIXEL_LIST]
             kwargs['pixel'] = pixel
