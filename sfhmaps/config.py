@@ -15,8 +15,7 @@ addition to simple parameters. All of the names it defines (except for
 modules and special members) are loaded into the `sfhmaps.config`
 namespace.
 
-
-.. caution:: The configuration file is loaded with ``__import__``, which
+.. caution:: The configuration file is loaded using ``__import__``, which
    executes all of its code, so be careful!
 
 
@@ -59,7 +58,7 @@ def _get_namespace(
     `module_path` can point to any python file (module), regardless of
     whether it lives in a package.
 
-    .. caution:: The namespace is retrieved with ``__import__``, which
+    .. caution:: The namespace is retrieved using ``__import__``, which
        executes all code in the module, so be careful about what
        `module_path` points to!
 

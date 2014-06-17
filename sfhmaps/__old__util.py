@@ -1,80 +1,13 @@
-from astropy import table as tbl, wcs
+from astropy import wcs
 import numpy as np
 import os
-import subprocess
 
 from . import config
 
 
 
-# Shell and misc.
-# ---------------
-
-
-def is_string(obj):
-    """Check if an object is a string rather than a list of strings.
-
-    Note that a slightly more straightforward test would be, ::
-
-      return hasattr(obj, '__iter__')
-
-    because lists and tuples have the __iter__ method while strings do not.
-    However, this will only work in Python 2.x as strings in Python 3 have
-    the __iter__ method.
-
-    """
-    return ''.join(obj) == obj
-
-
-
 # Parsers
 # -------
-def parse_zcbtable(zcbfile):
-    """Load a zcombine output file into an astropy table.
-
-    =========  ======= ====================================================
-    columns    units   description
-    =========  ======= ====================================================
-    log(age_i) yr      Log age of the young (most recent) side of each bin
-    log(age_f) yr      Log age of the old side of each bin
-    dmod               Distance modulus
-    SFR        Msun/yr Star formation rate
-    SFR_eu     Msun/yr Upper error for SFR
-    SFR_el     Msun/yr Lower error for SFR
-    [M/H]              Metallicity, where the solar value is [M/H] = 0 [1]_
-    [M/H]_eu           Upper error for [M/H]
-    [M/H]_el           Lower error for [M/H]
-    d[M/H]             Metallicity spread
-    d[M/H]_eu          Upper error for [M/H]
-    d[M/H]_el          Lower error for [M/H]
-    CSF                Cumulative mass formed as a fraction of total mass
-    CSF_eu             Upper error for CSF
-    CSF_el             Lower error for CSF
-    =========  ======= ====================================================
-
-    .. [1] The MATCH readme uses "logZ" for metallicity, but Z is typically
-       reserved for metal abundance, for which the solar value is 0.02.
-
-    """
-    names = ['log(age_i)', 'log(age_f)', 'dmod',
-             'SFR', 'SFR_eu', 'SFR_el', '[M/H]', '[M/H]_eu', '[M/H]_el',
-             'd[M/H]', 'd[M/H]_eu', 'd[M/H]_el', 'CSF', 'CSF_eu', 'CSF_el']
-    dtypes = ['float'] * 15
-
-    data = []
-    with open(zcbfile, 'r') as f:
-        for row in f:
-            row = row.split()
-            if row:
-                try:
-                    float(row[0])
-                except ValueError:
-                    continue
-                data.append(row)
-    table = tbl.Table(zip(*data), names=names, dtype=dtypes)
-    return table
-
-
 def parse_coordfile(coordfile):
     """Load pixel vertices into a an array.
 
@@ -99,106 +32,6 @@ def parse_coordfile(coordfile):
     vertices[0] = data[:,0::2].reshape(shape[1:])  # RA
     vertices[1] = data[:,1::2].reshape(shape[1:])  # dec
     return vertices
-
-
-
-# MATCH utilities
-# ---------------
-def zcombine(sfhfile, outfile, param=None, best=None, bestonly=False,
-             unweighted=False, medbest=False, jeffreys=False, norun=False):
-    """Wrapper for the MATCH zcombine utility.
-
-    Parameters
-    ----------
-    sfhfile : str or list
-        Path(s) to the calcsfh SFH output file(s) to be processed.
-    outfile : str
-        Path for the zcombine output file.
-    param : str, optional
-        Path to a zcombine parameter file specifying the time bins for
-        ``outfile``. Default is None.
-    best : str, optional
-        Default is None.
-    bestonly : bool, optional
-        Default is False
-    unweighted : bool, optional
-        Default is False
-    medbest : bool, optional
-        Default is False
-    jeffreys : bool, optional
-        Default is False
-    norun : bool, optional
-        If True, then the command string is not passed to subprocess.call
-        (useful for testing a command before running it). Default is False.
-
-    Returns
-    -------
-    string
-        zcombine command string.
-
-    """
-    cmd = 'zcombine'
-
-    if param is not None:
-        cmd += ' -param={:s}'.format(param)
-    if unweighted:
-        cmd += ' -unweighted'
-    if medbest:
-        cmd += ' -medbest'
-    if jeffreys:
-        cmd += ' -jeffreys'
-    if best is not None:
-        cmd += ' -best={:s}'.format(best)
-
-    if is_string(sfhfile):
-        sfhfile = [sfhfile]
-    cmd += ' {:s}'.format(' '.join(sfhfile))
-
-    if bestonly:
-        cmd += ' -bestonly'
-
-    cmd += ' > {:s}'.format(outfile)
-
-    if not norun:
-        subprocess.call(cmd, shell=True)
-    return cmd
-
-
-def zcmerge(zcbfile, outfile, absolute=False, norun=False):
-    """Wrapper for the MATCH zcmerge utility.
-
-    Parameters
-    ----------
-    zcbfile : str or list
-        Path(s) to the zcombine SFH output file(s) to be processed.
-    outfile : str
-        Path for the zcombine output file.
-    absolute : bool, optional
-        Default is False
-    norun : bool, optional
-        If True, then the command string is not passed to subprocess.call
-        (useful for testing a command before running it). Default is False.
-
-    Returns
-    -------
-    string
-        zcmerge command string.
-
-    """
-    cmd = 'zcmerge'
-
-    if is_string(zcbfile):
-        zcbfile = [zcbfile]
-    cmd += ' {:s}'.format(' '.join(zcbfile))
-
-    if absolute:
-        cmd += ' -absolute'
-
-    cmd += ' > {:s}'.format(outfile)
-
-    if not norun:
-        subprocess.call(cmd, shell=True)
-    return cmd
 
 
 
