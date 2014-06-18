@@ -19,11 +19,14 @@ Dependencies:
 Functions
 ---------
 
-========== ==============================================================
-|calc_sed| Calculate the SED for a binned SFH.
-|get_zmet| Return the closest FSPS `zmet` integer for the given log metal
-           abundance.
-========== ==============================================================
+=============== ========================================================
+|calc_sed|      Calculate the SED for a binned SFH.
+|get_zmet|      Return the closest FSPS `zmet` integer for the given log
+                metal abundance.
+|calc_pixscale| Calculate the pixel scale from the WCS information in a
+                FITS header.
+|gcdist|        Calculate the great circle distance between two points.
+=============== ========================================================
 
 
 ============
@@ -32,13 +35,18 @@ Module Index
 
 - `sfhmaps.config`
 - `sfhmaps.flux`
+- `sfhmaps.wcs`
 
 
 .. references
 
 .. |calc_sed| replace:: `~sfhmaps.flux.calc_sed`
-.. |calc_sed| replace:: `~sfhmaps.flux.get_zmet`
+.. |get_zmet| replace:: `~sfhmaps.flux.get_zmet`
+
+.. |calc_pixscale| replace:: `~sfhmaps.wcs.calc_pixscale`
+.. |gcdist| replace:: `~sfhmaps.wcs.gcdist`
 
 """
 #from . import config  # Deprecate?
 from .flux import calc_sed, get_zmet
+from .wcs import calc_pixscale, gcdist
