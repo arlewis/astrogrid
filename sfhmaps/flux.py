@@ -26,7 +26,7 @@ from sedpy import observate, attenuation
 from . import util
 
 
-CURRENT_SP = None  # Global container for fsps.StellarPopulation
+CURRENT_SP = []  # Container for fsps.StellarPopulation
 
 
 def get_zmet(logZ):
@@ -112,10 +112,10 @@ def calc_sed(sfr, age, **kwargs):
     The form of the input SFH is set of age bins with a SFR value assigned
     to each bin. At each point in time in the SFH, an SED is generated
     using an `fsps.StellarPopulation` instance. It can take several seconds
-    to create the instance initially, but it is saved in the `CURRENT_SP`
-    global variable and is reused to save time for subsequent calls to
-    `calc_sed`. If needed, the current `fsps.StellarPopulation` instance
-    can be cleared by setting `CURRENT_SP` to None.
+    to create the instance initially, but it is saved in `CURRENT_SP` and
+    is reused to save time for subsequent calls to `calc_sed`. If needed,
+    the current `fsps.StellarPopulation` instance can be cleared with
+    ``CURRENT_SP.pop(0)``.
 
     All stellar population synthesis is performed under the hood using FSPS
     with the Padova isochrones and BaSeL stellar library. `python-fsps`
@@ -190,7 +190,7 @@ def calc_sed(sfr, age, **kwargs):
         list          str    array, shape is (len(age_observe),)
         list          list   array, shape is (len(age_observe),len(band))
         ============= ====== ============================================
-        
+
     Notes
     -----
 
@@ -230,10 +230,11 @@ def calc_sed(sfr, age, **kwargs):
     fsps_kwargs = kwargs.get('fsps_kwargs', {})
 
     # To save time, create StellarPopulation only when necessary
-    global CURRENT_SP  # attempting to modify, so must declare as global
-    if CURRENT_SP is None:
-        CURRENT_SP = fsps.StellarPopulation()
-    sp = CURRENT_SP
+    try:
+        sp = CURRENT_SP[0]
+    except IndexError:
+        sp = fsps.StellarPopulation()
+        CURRENT_SP.append(sp)
     fsps_kwargs['sfh'] = 0
     sp.params._params.update(fsps_kwargs)
 

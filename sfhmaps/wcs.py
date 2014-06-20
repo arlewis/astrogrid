@@ -21,6 +21,50 @@ from astropy import wcs
 import numpy as np
 
 
+def make_header(xy, ad, ref='central'):
+    """
+    ref : {'center', tuple}, optional
+        If 'center' (default), the reference pixel is set to the central
+        pixel in the image. An x,y tuple of floats may be given to use a
+        specific reference pixel instead.
+
+
+    """
+    # Make a new header; assume a TAN projection with RA,dec coords in deg
+    hdr = fits.Header()
+    hdr['wcsaxes'] = 2
+    hdr['ctype1'] = 'RA---TAN'
+    hdr['ctype2'] = 'DEC--TAN'
+
+    # Choose a reference point
+    i, j = (config.NROW+1)/2, (config.NCOL+1)/2  # middle point in the grid
+    hdr['CRPIX1'], hdr['CRPIX2'] = xy[:,i,j]
+    hdr['CRVAL1'], hdr['CRVAL2'] = ad[:,i,j]
+
+    # CD matrix
+    xy, ad = xy.T.reshape((-1, 2)), ad.T.reshape((-1, 2))
+    cd = fit_cdmatrix(xy, ad, hdr)
+    hdr['CD1_1'], hdr['CD1_2'] = cd[0, 0], cd[0, 1]
+    hdr['CD2_1'], hdr['CD2_2'] = cd[1, 0], cd[1, 1]
+
+    return hdr
+
+
+def fit_cdmatrix(xy, ad, hdr):
+    # Calculate projection plane coords
+    p, t = util.celsph2natsph(ad[:,0], ad[:,1], hdr)  # CRVALi
+    u, v = util.natsph2proj(p, t, hdr)  # TAN projection
+    uv = np.vstack((u, v)).T
+
+    # Delta x, Delta y
+    deltaxy = xy - np.array([hdr['CRPIX1'], hdr['CRPIX2']])
+
+    # Solve for CD elements
+    cd11, cd12 = leastsquares(deltaxy[:,0], deltaxy[:,1], uv[:,0])
+    cd21, cd22 = leastsquares(deltaxy[:,0], deltaxy[:,1], uv[:,1])
+    return np.array([[cd11, cd12], [cd21, cd22]])
+
+
 def gcdist(lon1, lat1, lon2, lat2, deg=True):
     """Calculate the great circle distance between two points.
 
@@ -71,9 +115,9 @@ def calc_pixscale(hdr, ref='crpix'):
     hdr : astropy.io.fits.Header
         Header object with WCS keywords. Must have the keys 'naxis1',
         'naxis2', 'crpix1', 'crpix2', 'crval1', and 'crval1'.
-    ref : {'crpix', 'central', tuple}, optional
+    ref : {'crpix', 'center', tuple}, optional
         If 'crpix' (default), the reference pixel is set to CRPIX1,CRPIX2.
-        'central' indicates that the central pixel in the image should be
+        'center' indicates that the central pixel in the image should be
         used. An x,y tuple of floats may be given to use a specific
         reference pixel instead.
 

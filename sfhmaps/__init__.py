@@ -6,8 +6,9 @@
 
 Create maps from star formation history (SFH) data.
 
-Dependencies:
+`sfhmaps` requires the following packages:
 
+- `astropy <http://www.astropy.org>`_
 - `FSPS <http://people.ucsc.edu/~conroy/FSPS.html>`_ and
   `python-fsps <https://github.com/dfm/python-fsps>`_
   (or `this <https://github.com/bd-j/python-fsps>`_ fork)
@@ -33,8 +34,8 @@ Functions
 Module Index
 ============
 
-- `sfhmaps.config`
 - `sfhmaps.flux`
+- `sfhmaps.util`
 - `sfhmaps.wcs`
 
 
@@ -47,6 +48,5 @@ Module Index
 .. |gcdist| replace:: `~sfhmaps.wcs.gcdist`
 
 """
-#from . import config  # Deprecate?
 from .flux import calc_sed, get_zmet
 from .wcs import calc_pixscale, gcdist
