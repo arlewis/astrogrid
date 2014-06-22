@@ -21,7 +21,7 @@ from astropy import wcs
 import numpy as np
 
 
-def make_header(xy, ad, ref='central'):
+def make_header(xy, ad, ref='center'):
     """
     ref : {'center', tuple}, optional
         If 'center' (default), the reference pixel is set to the central
@@ -36,10 +36,14 @@ def make_header(xy, ad, ref='central'):
     hdr['ctype1'] = 'RA---TAN'
     hdr['ctype2'] = 'DEC--TAN'
 
-    # Choose a reference point
-    i, j = (config.NROW+1)/2, (config.NCOL+1)/2  # middle point in the grid
-    hdr['CRPIX1'], hdr['CRPIX2'] = xy[:,i,j]
-    hdr['CRVAL1'], hdr['CRVAL2'] = ad[:,i,j]
+    # Reference point
+    if ref == 'center':
+        # j=(x.max()-x.min())/2+x.min(), etc.
+        i, j = (config.NROW+1)/2, (config.NCOL+1)/2  # middle point in the grid
+        hdr['CRPIX1'], hdr['CRPIX2'] = xy[:,i,j]
+        hdr['CRVAL1'], hdr['CRVAL2'] = ad[:,i,j]
+    else:
+        pass  # 
 
     # CD matrix
     xy, ad = xy.T.reshape((-1, 2)), ad.T.reshape((-1, 2))
