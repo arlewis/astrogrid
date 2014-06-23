@@ -32,7 +32,7 @@ def islistlike(obj):
             not isstring(obj))
 
 
-def leastsquares(x, y, z):
+def leastsquares2d(x, y, z):
     """Use 2d least squares minimization to find the best-fit a and b for
     zi = a*xi + b*yi.
 
@@ -40,21 +40,22 @@ def leastsquares(x, y, z):
 
     Parameters
     ----------
-    x, y
+    x, y : array
+        Input x and y values.
+    z : array
+        z values for all pairs of x and y.
+
+    Returns
+    -------
+    tuple
+        The best-fit ``a`` and ``b`` parameters for the given data.    
 
     Notes
     -----
-    Let, ::
-
-      f(x,y) = a*x + b*y
-
-    Given a set of measurements ``zi`` for each pair of ``xi`` and ``yi``,
-    find ``a`` and ``b`` such that ``S = sum(ri**2)`` is minimized (the
-    gradient of ``S`` is zero), where ``ri = zi - f(xi,yi)``.
-
-    So, ::
-
-      dS/da = dS/db = 0
+    Let, ``f(x,y) = a*x + b*y``. Given a set of measurements ``zi`` for
+    each pair of ``xi`` and ``yi``, the goal is to find ``a`` and ``b``
+    such that ``S = sum(ri**2)`` is minimized (the gradient of ``S`` is
+    zero, ``dS/da = dS/db = 0``), where ``ri = zi - f(xi,yi)``.
 
     The derivatives are, ::
 
