@@ -20,14 +20,17 @@ Create maps from star formation history (SFH) data.
 Functions
 ---------
 
-=============== ========================================================
+=============== ==========================================================
+|calc_mag|      Calculate the magnitude of an SED in a given filter.
 |calc_sed|      Calculate the SED for a binned SFH.
 |get_zmet|      Return the closest FSPS `zmet` integer for the given log
                 metal abundance.
-|calc_pixscale| Calculate the pixel scale from the WCS information in a
-                FITS header.
-|gcdist|        Calculate the great circle distance between two points.
-=============== ========================================================
+|make_header|   Create a FITS header from a set of points with known pixel
+                and world coordinates given a celestial coordinate system
+                and projection.
+|mag2flux|      Convert AB magnitude in a filter to flux (erg s-1 cm-2
+                A-1).
+=============== ==========================================================
 
 
 ============
@@ -41,12 +44,12 @@ Module Index
 
 .. references
 
+.. |calc_mag| replace:: `~sfhmaps.flux.calc_mag`
 .. |calc_sed| replace:: `~sfhmaps.flux.calc_sed`
 .. |get_zmet| replace:: `~sfhmaps.flux.get_zmet`
 
-.. |calc_pixscale| replace:: `~sfhmaps.wcs.calc_pixscale`
-.. |gcdist| replace:: `~sfhmaps.wcs.gcdist`
+.. |make_header| replace:: `~sfhmaps.wcs.make_header`
 
 """
-from .flux import calc_sed, get_zmet
-from .wcs import calc_pixscale, gcdist
+from .flux import calc_mag, calc_sed, get_zmet, mag2flux
+from .wcs import make_header

@@ -12,9 +12,11 @@ Functions
 ---------
 
 ========== ==============================================================
+`calc_mag` Calculate the magnitude of an SED in a given filter.
 `calc_sed` Calculate the SED for a binned SFH.
 `get_zmet` Return the closest FSPS `zmet` integer for the given log metal
            abundance.
+`mag2flux` Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
 ========== ==============================================================
 
 """
@@ -109,17 +111,17 @@ def get_zmet(logZ):
 def calc_sed(sfr, age, **kwargs):
     """Calculate the SED for a binned SFH.
 
-    The form of the input SFH is set of age bins with a SFR value assigned
-    to each bin. At each point in time in the SFH, an SED is generated
-    using an `fsps.StellarPopulation` instance. It can take several seconds
-    to create the instance initially, but it is saved in `CURRENT_SP` and
-    is reused to save time for subsequent calls to `calc_sed`. If needed,
-    the current `fsps.StellarPopulation` instance can be cleared with
-    ``CURRENT_SP.pop(0)``.
+    The form of the input SFH is a set of age bins with a SFR value
+    assigned to each bin. At each point in time in the SFH, an SED is
+    generated using an `fsps.StellarPopulation` instance. It can take
+    several seconds to create the instance initially, but it is saved in
+    `CURRENT_SP` and is reused to save time for subsequent calls to
+    `calc_sed`. If needed, the current `fsps.StellarPopulation` instance
+    can be cleared with ``CURRENT_SP.pop(0)``.
 
     All stellar population synthesis is performed under the hood using FSPS
     with the Padova isochrones and BaSeL stellar library. `python-fsps`
-    provides the python interface, and integrated SEDs are computed from an
+    provides the python interface, and integrated SEDs are computed from
     input SFHs using the `scombine` and `sedpy` packages. This function
     merely puts everything together under a single interface for
     convenience.
@@ -143,18 +145,10 @@ def calc_sed(sfr, age, **kwargs):
         also be a list of ages. Default is 1. Note that 0 will throw a
         RuntimeWarning about dividing by zero. It is safer to use a small
         positive number instead (hence 1 yr as the default).
-    band : str or list, optional
-        Name of the filter in which to calculate flux. If specified, flux
-        in the filter is returned instead of the SED spectrum. May also be
-        a list of filter names. See `fsps.find_filter` or
-        `fsps.fsps.FILTERS` for valid names. Default is an empty list
-        (return the SED spectrum).
     bin_res : float, optional
         Time resolution factor used for resampling the input SFH. The time
         step in the resampled SFH is equal to the narrowest age bin divided
         by this number. Default is 20.
-    dmod : float, optional
-        Distance modulus. Default is 0.
     av, dav : float, optional
         Foreground and differential V-band extinction parameters. Default
         is None (0). [1]_
@@ -171,26 +165,12 @@ def calc_sed(sfr, age, **kwargs):
 
     Returns
     -------
-    tuple, float, or array
-        By default, a tuple is returned containing an array of wavelengths
-        (in Angstroms) and an array of spectral flux values (Lsun A-1) at
-        each wavelength. If `band` is specified, then magnitudes in the
-        given filters are returned instead. The types and shapes of output
-        determined by `age_observe` and `band` are summarized in the table:
-
-        ============= ====== ============================================
-        `age_observe` `band` output
-        ============= ====== ============================================
-        float         None   (wave, spec),
-                             spec shape is (len(wave),)
-        list          None   (wave, spec),
-                             spec shape is (len(age_observe),len(wave))
-        float         str    float
-        float         list   array, shape is (len(band),)
-        list          str    array, shape is (len(age_observe),)
-        list          list   array, shape is (len(age_observe),len(band))
-        ============= ====== ============================================
-
+    tuple
+        A tuple containing an array of wavelengths (in Angstroms) and an
+        array of spectral flux values (Lsun A-1) at each wavelength. If
+        `age_observe` is a list, then the spectrum array has shape
+        (len(age_observe), len(wave)), otherwise it has shape (len(wave),).
+        
     Notes
     -----
 
@@ -215,15 +195,7 @@ def calc_sed(sfr, age, **kwargs):
         age_list = [age_list]
         len_age_list = 0
 
-    band_list = kwargs.get('band', [])
-    if util.islistlike(band_list):
-        len_band_list = len(band_list)
-    else:
-        band_list = [band_list]
-        len_band_list = 0
-
     bin_res = kwargs.get('bin_res', 20.0)
-    dmod = kwargs.get('dmod', 0.0)
     av, dav = kwargs.get('av', None), kwargs.get('dav', None)
     nsplit = kwargs.get('nsplit', 30)
     dust_curve = kwargs.get('dust_curve', attenuation.cardelli)
@@ -236,7 +208,8 @@ def calc_sed(sfr, age, **kwargs):
         sp = fsps.StellarPopulation()
         CURRENT_SP.append(sp)
     fsps_kwargs['sfh'] = 0
-    sp.params._params.update(fsps_kwargs)
+    for key, val in fsps_kwargs.items():
+        sp.params[key] = val
 
     # Resample the SFH to a high time resolution
     #
@@ -259,23 +232,135 @@ def calc_sed(sfr, age, **kwargs):
     else:
         wave, spec, weights, lum_ir = output
 
-    if band_list:
-        # Magnitudes
-        band_list = observate.load_filters(band_list)
-        spec *= bsp.to_cgs  # erg s-1 cm-2 A-1
-        mags = observate.getSED(wave, spec, filterlist=band_list)  # Absolute
-        mags += dmod  # Apparent
-        if not len_age_list and not len_band_list:
-            mags = float(mags)
-        else:
-            if len_band_list == 1:
-                mags = np.expand_dims(mags, 1)
-            if len_age_list == 1:
-                mags = np.expand_dims(mags, 0)
-        result = mags
-    else:
-        if not len_age_list:
-            spec = spec[0]
-        result = (wave, spec)
+    if not len_age_list:
+        spec = spec[0]
 
-    return result
+    return wave, spec
+
+
+def calc_mag(wave, spec, band, dmod=None):
+    """Calculate the magnitude of an SED in a given filter.
+
+    Parameters
+    ----------
+    wave : array
+        1d array of wavelengths (in Angstroms) where the SED is defined.
+    spec : array
+        Spectral flux values (Lsun A-1) at each wavelength in `wave`. The
+        array may be a single spectrum of shape (len(wave),), or contain N
+        individual spectra such that the shape is (N, len(wave)).
+    band : str or list
+        Filter, or a list of filters, within which to calculate absolute
+        magnitude. See `fsps.find_filter` or `fsps.fsps.FILTERS` for valid
+        filter names.
+    dmod : float, optional
+        Distance modulus used to calculate apparent magnitudes. If given,
+        the returned magnitudes are apparent instead of absolute. Default
+        is None.
+
+    Returns
+    -------
+    float or array
+        AB magnitudes in the given filters. [1]_ If `spec` is a single
+        spectrum and `band` is one name, then a float is returned. A 1d
+        array is returned if either `spec` or `band` contain multiple
+        values. If both `spec` and `band` contain multiple values, then a
+        2d array of shape (len(spec), len(band)) is returned.
+
+    Notes
+    -----
+
+    .. [1] The SED data is processed using `observate.getSED`, which always
+       returns AB magnitudes.
+
+    """
+    spec_list = spec
+    if spec_list.ndim == 1:
+        spec_list = np.expand_dims(spec_list, 0)
+        len_spec_list = 0
+    else:
+        len_spec_list = len(spec_list)
+
+    band_list = band
+    if util.islistlike(band_list):
+        len_band_list = len(band_list)
+    else:
+        band_list = [band_list]
+        len_band_list = 0
+
+    band_list = observate.load_filters(band_list)
+    spec_list = spec_list * bsp.to_cgs  # erg s-1 cm-2 A-1
+    mags = observate.getSED(wave, spec_list, filterlist=band_list)  # Absolute
+
+    if dmod is not None:
+        mags += dmod  # Apparent
+
+    if not len_spec_list and not len_band_list:
+        mags = float(mags)
+    else:
+        if len_band_list == 1:
+            mags = np.expand_dims(mags, 1)
+        if len_age_list == 1:
+            mags = np.expand_dims(mags, 0)
+
+    return mags
+
+
+def _galex_cps2flux(cps, band):
+    """Counts per second to flux (erg s-1 cm-2 A-1)."""
+    scale = {'galex_fuv': 1.40e-15, 'galex_nuv': 2.06e-16}
+    return scale[band] * cps
+
+
+def _galex_flux2cps(flux, band):
+    """Flux (erg s-1 cm-2 A-1) to counts per second."""
+    scale = {'galex_fuv': 1.40e-15, 'galex_nuv': 2.06e-16}
+    return  flux / scale[band]
+
+
+def _galex_cps2mag(cps, band):
+    """Counts per second to AB magnitude."""
+    zeropoint = {'galex_fuv': 18.82, 'galex_nuv': 20.08}
+    return -2.5 * np.log10(cps) + zeropoint[band]
+
+
+def _galex_mag2cps(mag, band):
+    """AB magnitude to counts per second."""
+    zeropoint = {'galex_fuv': 18.82, 'galex_nuv': 20.08}
+    return 10**(0.4 * (zeropoint[band] - mag))
+
+
+def _galex_flux2mag(flux, band):
+    """Flux (erg s-1 cm-2 A-1) to AB magnitude."""
+    return _galex_cps2mag(_galex_flux2cps(flux, band), band)
+
+
+def _galex_mag2flux(mag, band):
+    """AB magnitude to flux (erg s-1 cm-2 A-1)."""
+    return _galex_cps2flux(_galex_mag2cps(mag, band), band)
+
+
+def mag2flux(mag, band):
+    """Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
+
+    Parameters
+    ----------
+    mag : float or array
+        Input AB magnitude(s) in the given filter.
+    band : str
+        Name of the filter corresponding to `mag`. See `fsps.find_filter`
+        or `fsps.fsps.FILTERS` for valid filter names.       
+
+    Returns
+    -------
+    float or array
+        Flux in erg s-1 cm-2 A-1.
+
+    """
+    if band in ['galex_fuv', 'galex_nuv']:
+        flux = _galex_mag2flux(mag, band)
+    else:
+        # Raise error?
+        flux = None
+
+    return flux

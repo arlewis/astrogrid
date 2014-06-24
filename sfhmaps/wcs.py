@@ -38,10 +38,14 @@ Functions
                 FITS header.
 `fit_cdmatrix`  Attempt to fit a CD matrix for a set of points with known
                 pixel and world coordinates.
+`make_header`   Create a FITS header from a set of points with known pixel
+                and world coordinates given a celestial coordinate system
+                and projection.
 =============== =======================================================
 
 """
 from astropy import wcs
+from astropy.io import fits
 import numpy as np
 
 from . import util
@@ -565,33 +569,54 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
     return np.array([[cd11, cd12], [cd21, cd22]])
 
 
-def make_header(xy, ad, ref='center'):
-    """
-    ref : {'center', tuple}, optional
-        If 'center' (default), the reference pixel is set to the central
-        pixel in the image. An x,y tuple of floats may be given to use a
-        specific reference pixel instead.
+def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
+    """Create a FITS header from a set of points with known pixel and world
+    coordinates given a celestial coordinate system and projection.
 
+    `fit_cdmatrix` is used to find the best-fit CD matrix for the given
+    data.
+
+    Parameters
+    ----------
+    x, y : array
+        x and y pixel coordinates.
+    lon, lat : array
+        Celestial longitude and latitude (world) coordinates.
+    ctype1, ctype2 : str, optional
+        Values for the CTYPE1 and CTYPE2 header keywords; describes the
+        coordinate system of `lon` and `lat` and sets the projection.
+    ref : tuple, optional
+        A tuple of containing the (x, y, lon, lat) coordinates of a chosen
+        reference pixel. If None (default), then the reference pixel is
+        automatically chosen as the most central point in the x and y data.
+
+    Returns
+    -------
+    astropy.io.fits.Header
+        A minimal header containing the WCS information that describes the
+        data, including the best-fit CD matrix.
 
     """
-    # Make a new header; assume a TAN projection with RA,dec coords in deg
+    # Make a new header
     hdr = fits.Header()
-    hdr['wcsaxes'] = 2
-    hdr['ctype1'] = 'RA---TAN'
-    hdr['ctype2'] = 'DEC--TAN'
+    hdr['WCSAXES'] = 2
+    hdr['CTYPE1'], hdr['CTYPE2'] = ctype1, ctype2
 
     # Reference point
-    if ref == 'center':
-        # j=(x.max()-x.min())/2+x.min(), etc.
-        i, j = (config.NROW+1)/2, (config.NCOL+1)/2  # middle point in the grid
-        hdr['CRPIX1'], hdr['CRPIX2'] = xy[:,i,j]
-        hdr['CRVAL1'], hdr['CRVAL2'] = ad[:,i,j]
+    if ref:
+        hdr['CRPIX1'], hdr['CRPIX2'] = ref[0], ref[1]
+        hdr['CRVAL1'], hdr['CRVAL2'] = ref[2], ref[3]
     else:
-        pass  # 
+        # Use the most central data point
+        xmid = (x.max() - x.min())/2 + x.min()
+        ymid = (y.max() - y.min())/2 + y.min()
+        r = np.sqrt((x-xmid)**2 + (y-ymid)**2)
+        idx = tuple(i[0] for i in np.where(r == r.min()))
+        hdr['CRPIX1'], hdr['CRPIX2'] = x[idx], y[idx]
+        hdr['CRVAL1'], hdr['CRVAL2'] = lon[idx], lat[idx]
 
     # CD matrix
-    xy, ad = xy.T.reshape((-1, 2)), ad.T.reshape((-1, 2))
-    cd = fit_cdmatrix(xy, ad, hdr)
+    cd = fit_cdmatrix(x, y, lon, lat, hdr)
     hdr['CD1_1'], hdr['CD1_2'] = cd[0, 0], cd[0, 1]
     hdr['CD2_1'], hdr['CD2_2'] = cd[1, 0], cd[1, 1]
 

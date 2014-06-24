@@ -19,6 +19,7 @@ Functions
 """
 import os
 import errno
+import numpy as np
 
 
 def isstring(obj):
