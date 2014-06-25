@@ -505,22 +505,21 @@ def calc_pixscale(hdr, ref='crpix'):
 
     if ref == 'crpix':
         x0, y0 = hdr['crpix1'], hdr['crpix2']
-        ad0 = hdr['crval1'], hdr['crval2']
-    elif ref == 'central':
+        lon0, lat0 = hdr['crval1'], hdr['crval2']
+    elif ref == 'center':
         x0, y0 = hdr['naxis1']/2, hdr['naxis2']/2
-        a0, d0 = hwcs.wcs_pix2world(x0, y0, 1)
-        ad0 = [a0, d0]
+        lon0, lat0 = hwcs.wcs_pix2world(x0, y0, 1)
     else:
         x0, y0 = ref
-        a0, d0 = hwcs.wcs_pix2world(x0, y0, 1)
-        ad0 = [a0, d0]
+        lon0, lat0 = hwcs.wcs_pix2world(x0, y0, 1)
 
     xy = np.array([[x0+1, y0], [x0, y0+1]])
+    lonlat = hwcs.wcs_pix2world(xy, 1)
+    lon1, lat1 = lonlat[0]
+    lon2, lat2 = lonlat[1]
 
-    ad = hwcs.wcs_pix2world(xy, 1)
-
-    scale1 = gcdist(ad0[0], ad0[1], ad[0,0], ad[0,1], deg=True) * 3600
-    scale2 = gcdist(ad0[0], ad0[1], ad[1,0], ad[1,1], deg=True) * 3600
+    scale1 = gcdist(lon0, lat0, lon1, lat1, deg=True) * 3600
+    scale2 = gcdist(lon0, lat0, lon2, lat2, deg=True) * 3600
     return scale1, scale2
 
 
@@ -621,3 +620,56 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
     hdr['CD2_1'], hdr['CD2_2'] = cd[1, 0], cd[1, 1]
 
     return hdr
+
+
+
+# Tests
+# -----
+def _make_header_imwcs(filename, x, y, lon, lat,
+                       ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
+    """Create a FITS header using imwcs; a sanity check for `make_header`.
+
+    The program requires an existing .fits file (the WCS in the header is
+    ignored). A new file is written with the suffix 'w.fits'.
+
+    This seems to give results similar to `make_header`, providing some
+    validation for the CD matrix fitting method. This was tested on most of
+    the PHAT bricks, and the maximum difference between input and output
+    x,y was ~2% (0.02 pixels) for both methods. For most bricks, imwcs was
+    marginally better at reproducing the input x,y from the known RA,dec,
+    however it produced a fairly inaccurate solution for brick 12
+    (discrepancies up to 1-2 pixels between input and output x,y)
+    suggesting that `make_header` is more robust.
+    
+    """
+    
+    import subprocess
+
+    lon = lon * 24./360  # hours
+    coords = []
+    for xp, yp, RA, DEC in zip(x.ravel(), x.ravel(), lon.ravel(), lat.ravel()):
+        h = int(RA)
+        m = int((RA - h) * 60)
+        s = (((RA - h) * 60) - m) * 60
+        hms = '{0:02d} {1:d} {2:8.5f}'.format(h, m, s)
+
+        d = int(DEC)
+        m = int((DEC - d) * 60)
+        s = (((DEC - d) * 60) - m) * 60
+        dms = '{0:02d} {1:d} {2:8.5f}'.format(d, m, s)
+
+        cstr = '{0:15.8f} {1:15.8f}    {2:s}    {3:s}\n'.format(xp, yp, hms, dms)
+        coords.append(cstr)
+
+    dirname = os.path.dirname(filename)
+    coordlistfile = os.path.join(dirname, 'coords.dat')
+    with open(coordlistfile, 'w') as f:
+        f.writelines(coords)
+
+    filename = os.path.basename(filename)
+    coordlistfile = os.path.basename(coordlistfile)
+    cmd = ('cd {0:s}; imwcs -ew -n 8 -u {1:s} {2:s}'
+           .format(dirname, coordlistfile, filename))
+    subprocess.call(cmd, shell=True)
+
+    return None

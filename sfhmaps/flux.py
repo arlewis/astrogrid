@@ -160,7 +160,7 @@ def calc_sed(sfr, age, **kwargs):
         in Angstroms (see the `attenuation` module in `sedpy`). Default is
         `sedpy.attentuation.cardelli`. [1]_
     fsps_kwargs : dict, optional
-        Dictionary of valid keyword arguments for `fsps.StellarPopulation`.
+        Dictionary of keyword arguments for `fsps.StellarPopulation`.
         Default is an empty dictionary. 'sfh'=0 will always be used.
 
     Returns
@@ -364,3 +364,112 @@ def mag2flux(mag, band):
         flux = None
 
     return flux
+
+
+
+# Deprecated?
+# -----------
+def make_spec_scombine(spec_dir, sfhfile, imf_type, logZ):
+    """Create a basis file for `scombine.Combiner`.
+
+    The file is only created if one does not already exist for the given
+    IMF and metallicity.
+
+    Parameters
+    ----------
+    spec_dir : str
+        Path to the parent directory for the basis file.
+    sfhfile : str
+        Path to a file containing the binned SFH data. The format is that
+        of MATCH zcombine output files. Only the age bin data in the first
+        two columns are used.
+    imf_type : int
+        IMF (see the FSPS manual).
+    logZ : float
+        Metallicity, log(Z/Zsun).
+
+    Returns
+    -------
+    str
+        Path to the basis file.
+
+    """
+    import scombine
+
+    outroot = os.path.join(spec_dir, 'spec')
+    filename = scombine.generate_basis(
+                            sfhfile, zmet=10**logZ, imf_type=imf_type,
+                            t_lookback=0, outroot=outroot)[0]
+    return filename
+
+
+def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logZ, **kwargs):
+    """Calculate the magnitude of a binned SFH in a given filter.
+
+    The `scombine` module is used, which depends on having the proper
+    spectral basis files available. See `make_spec_scombine`. A file will
+    be automatically created if one does not already exist for the given
+    IMF and metallicity (this can take more than 10 minutes).
+
+    Parameters
+    ----------
+    sfhfile : str
+        Path to the file containing the binned SFH data. The format is that
+        of MATCH zcombine output files.
+    band : str
+        Filter within which to calculate absolute magnitude. See
+        `fsps.find_filter` or `fsps.fsps.FILTERS` for valid filter names.
+    spec_dir : str
+        Path to the directory containing the desired basis file.
+    imf_type : int
+        IMF (see the FSPS manual). Used to select the basis file.
+    logZ : float
+        Metallicity, log(Z/Zsun). Used to select the basis file.
+    dmod : float, optional
+        Distance modulus used to calculate apparent magnitudes. If given,
+        the returned magnitudes are apparent instead of absolute. Default
+        is None.
+    av, dav : float, optional
+        Foreground and differential V-band extinction parameters. Default
+        is None (0). [1]_
+    dust_curve : function, optional
+        Function that returns ``A_lambda/A_V`` (extinction normalized to
+        the total V-band extinction) for a given array of input wavelengths
+        in Angstroms (see the `attenuation` module in `sedpy`). Default is
+        `sedpy.attentuation.cardelli`. [1]_
+
+    Returns
+    -------
+    float
+        AB magnitude in the given filter.
+
+    Notes
+    -----
+
+    .. [1] The two-component extinction model assumes that V-band
+       extinctions in a stellar population follow a uniform distribution
+       from `av` to `av` + `dav`. `av` sets the total foreground V-band
+       extinction common to all stars and `dav` is the maximum amount of
+       differential V-band extinction. A reddened SED is obtained by
+       splitting the intrinsic SED into several equal pieces, reddening
+       each piece according to the assumed extinction curve (`dust_curve`)
+       and a random V-band extinction value drawn from the model, and then
+       summing the pieces back together.
+
+    """
+    import scombine
+
+    dmod = kwargs.get('dmod', None)
+    av, dav = kwargs.get('av', None), kwargs.get('dav', None)
+    av = 0 if av is None else av
+    dav = 0 if dav is None else dav
+    dust_curve = kwargs.get('dust_curve', attenuation.cardelli)
+
+    specfile = make_spec_scombine(spec_dir, sfhfile, imf_type, logZ)
+    combiner = scombine.Combiner(specfile, dust_law=dust_curve)
+    band_list = observate.load_filters([band])
+    mag = combiner.combine(sfhfile, av=av, dav=dav, filterlist=band_list)[2]
+    mag = float(mag)
+    if dmod:
+        mag += dmod
+    return mag

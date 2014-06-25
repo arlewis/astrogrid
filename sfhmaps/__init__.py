@@ -22,6 +22,8 @@ Functions
 
 =============== ==========================================================
 |calc_mag|      Calculate the magnitude of an SED in a given filter.
+|calc_pixscale| Calculate the pixel scale from the WCS information in a
+                FITS header.
 |calc_sed|      Calculate the SED for a binned SFH.
 |get_zmet|      Return the closest FSPS `zmet` integer for the given log
                 metal abundance.
@@ -49,7 +51,8 @@ Module Index
 .. |get_zmet| replace:: `~sfhmaps.flux.get_zmet`
 
 .. |make_header| replace:: `~sfhmaps.wcs.make_header`
+.. |calc_pixscale| replace:: `~sfhmaps.wcs.calc_pixscale`
 
 """
 from .flux import calc_mag, calc_sed, get_zmet, mag2flux
-from .wcs import make_header
+from .wcs import calc_pixscale, make_header

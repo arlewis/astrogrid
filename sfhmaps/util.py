@@ -29,8 +29,15 @@ def isstring(obj):
 
 def islistlike(obj):
     """True if the object is iterable like a list and is *not* a string."""
-    return ((hasattr(obj, '__iter__') or hasattr(obj, '__getitem__')) and
-            not isstring(obj))
+    cond = hasattr(obj, '__iter__') or hasattr(obj, '__getitem__')
+    if cond and not isstring(obj):
+        if hasattr(obj, 'shape') and not obj.shape:
+            test = False  # Probably a numpy integer or float array element
+        else:
+            test = True
+    else:
+        test = False
+    return test
 
 
 def leastsquares2d(x, y, z):
