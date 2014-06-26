@@ -22,16 +22,18 @@ Functions
 
 =============== ==========================================================
 |calc_mag|      Calculate the magnitude of an SED in a given filter.
-|calc_pixscale| Calculate the pixel scale from the WCS information in a
-                FITS header.
+|calc_pixscale| Calculate the x and y pixel scales from the WCS information
+                in a FITS header.
 |calc_sed|      Calculate the SED for a binned SFH.
 |get_zmet|      Return the closest FSPS `zmet` integer for the given log
                 metal abundance.
+|mag2flux|      Convert AB magnitude in a filter to flux (erg s-1 cm-2
+                A-1).
 |make_header|   Create a FITS header from a set of points with known pixel
                 and world coordinates given a celestial coordinate system
                 and projection.
-|mag2flux|      Convert AB magnitude in a filter to flux (erg s-1 cm-2
-                A-1).
+|round_logZ|    Return the closest log metal abundance value corresponding
+                to a valid choice of the FSPS zmet parameter.
 =============== ==========================================================
 
 
@@ -49,6 +51,7 @@ Module Index
 .. |calc_mag| replace:: `~sfhmaps.flux.calc_mag`
 .. |calc_sed| replace:: `~sfhmaps.flux.calc_sed`
 .. |get_zmet| replace:: `~sfhmaps.flux.get_zmet`
+.. |round_logZ| replace:: `~sfhmaps.flux.round_logZ`
 
 .. |make_header| replace:: `~sfhmaps.wcs.make_header`
 .. |calc_pixscale| replace:: `~sfhmaps.wcs.calc_pixscale`

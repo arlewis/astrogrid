@@ -10,68 +10,25 @@ Utilities for working with world coordinate systems.
 Functions
 ---------
 
-=============== =======================================================
-`gcdist`        Calculate the great circle distance between two points.
-`calc_pixscale` Calculate the pixel scale from the WCS information in a
-                FITS header.
-`fit_cdmatrix`  Attempt to fit a CD matrix for a set of points with known
-                pixel and world coordinates.
+=============== ===========================================================
+`calc_pixscale` Calculate the x and y pixel scales from the WCS information
+                in a FITS header.
+`fit_cdmatrix`  Fit a CD matrix for a set of points with known pixel and
+                world coordinates.
 `make_header`   Create a FITS header from a set of points with known pixel
                 and world coordinates given a celestial coordinate system
                 and projection.
-=============== =======================================================
+=============== ===========================================================
 
 """
-from astropy import wcs
-from astropy.io import fits
+import astropy.coordinates, astropy.io.fits, astropy.units, astropy.wcs
 import numpy as np
-from scipy import optimize
+import scipy.optimize
 
 
-def gcdist(lon1, lat1, lon2, lat2, deg=True):
-    """Calculate the great circle distance between two points.
-
-    Uses the law of haversines.
-
-    Parameters
-    ----------
-    lon1, lat1 : float or array-like
-        Longitude and latitude coordinates of the first point.
-    lon2, lat2 : float or array-like
-        Longitude and latitude coordinates of the second point.
-    deg : bool, optional
-        If True (default), the coordinate values are assumed to be in
-        degrees and the returned distance is in degrees as well. If False,
-        then the coordinates and distance are in radians.
-
-    Returns
-    -------
-    float or array
-
-    """
-    if deg:
-        lon1 = lon1 * np.pi / 180
-        lat1 = lat1 * np.pi / 180
-        lon2 = lon2 * np.pi / 180
-        lat2 = lat2 * np.pi / 180
-
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    haversine_lat = np.sin(dlat/2)**2
-    haversine_lon = np.sin(dlon/2)**2
-    haversine_l = haversine_lat + np.cos(lat1)*np.cos(lat2)*haversine_lon
-    l = 2 * np.arcsin(np.sqrt(haversine_l))
-    if deg:
-        l *= 180 / np.pi
-
-    return l
-
-
-def calc_pixscale(hdr, ref='crpix'):
-    """Calculate the pixel scale from the WCS information in a FITS header.
-
-    World coordinates are assumed to be in deg (e.g., CRVAL1 and CRVAL2).
-    The x and y pixel scales are returned in arcsec/pixel.
+def calc_pixscale(hdr, ref='crpix', units=(astropy.units.deg, astropy.units.deg)):
+    """Calculate the x and y pixel scales from the WCS information in a
+    FITS header.
 
     Parameters
     ----------
@@ -83,38 +40,37 @@ def calc_pixscale(hdr, ref='crpix'):
         'center' indicates that the central pixel in the image should be
         used. An x,y tuple of floats may be given to use a specific
         reference pixel instead.
+    units : tuple, optional
+        The units of the longitude and latitude coordinates as a tuple of
+        `astropy.units.core.Unit` instances. Both units are set to
+        `astropy.units.deg` by default.
 
     Returns
     -------
-    tuple
-        The pixel scales along the x and y directions.
+    astropy.coordinates.Angle
+        An `Angle` instance containing the x and y pixel scales.
 
     """
-    hwcs = wcs.WCS(hdr)
+    wcs = astropy.wcs.WCS(hdr)
 
     if ref == 'crpix':
-        x0, y0 = hdr['crpix1'], hdr['crpix2']
-        lon0, lat0 = hdr['crval1'], hdr['crval2']
+        x, y = hdr['crpix1'], hdr['crpix2']
     elif ref == 'center':
-        x0, y0 = hdr['naxis1']/2, hdr['naxis2']/2
-        lon0, lat0 = hwcs.wcs_pix2world(x0, y0, 1)
+        x, y = hdr['naxis1']/2, hdr['naxis2']/2
     else:
-        x0, y0 = ref
-        lon0, lat0 = hwcs.wcs_pix2world(x0, y0, 1)
+        x, y = ref
 
-    xy = np.array([[x0+1, y0], [x0, y0+1]])
-    lonlat = hwcs.wcs_pix2world(xy, 1)
-    lon1, lat1 = lonlat[0]
-    lon2, lat2 = lonlat[1]
-
-    scale1 = gcdist(lon0, lat0, lon1, lat1, deg=True) * 3600
-    scale2 = gcdist(lon0, lat0, lon2, lat2, deg=True) * 3600
-    return scale1, scale2
+    lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
+    # Makes no difference whether ICRS, Galactic, AltAz, etc.
+    points = astropy.coordinates.ICRS(lon, lat, unit=units)
+    dxy = astropy.coordinates.Angle([points[0].separation(points[1]),
+                                     points[0].separation(points[2])])
+    return dxy
 
 
-def fit_cdmatrix(x, y, lon, lat, hdr, test=False):
-    """Attempt to fit a CD matrix for a set of points with known pixel and
-    world coordinates.
+def fit_cdmatrix(x, y, lon, lat, hdr):
+    """Fit a CD matrix for a set of points with known pixel and world
+    coordinates.
 
     The world coordinates are transformed to projection plane coordinates
     for a given projection, and then a 2d least squares fitting method is
@@ -141,6 +97,7 @@ def fit_cdmatrix(x, y, lon, lat, hdr, test=False):
 
     """
     def residuals(p, dx, dy, ip):
+        # i represents x or y; xp - (cd11*dx + cd12*dy) and yp - (cd21*dx + cd22*dy)
         cdi1, cdi2 = p
         err = ip - (cdi1*dx + cdi2*dy)
         return err
@@ -154,9 +111,9 @@ def fit_cdmatrix(x, y, lon, lat, hdr, test=False):
     # celestial coordinates through step 2 to projection plane coordinates.
     # The CD matrix can then be fit because the coordinates before and
     # after step 3 are known.
-    hwcs = wcs.WCS(hdr)
-    hwcs.wcs.cd = np.array([[1, 0], [0, 1]])
-    xp, yp = hwcs.wcs_world2pix(lon, lat, 1)
+    wcs = astropy.wcs.WCS(hdr)
+    wcs.wcs.cd = np.array([[1, 0], [0, 1]])
+    xp, yp = wcs.wcs_world2pix(lon, lat, 1)
     xp, yp = xp - hdr['CRPIX1'], yp - hdr['CRPIX2']
 
     # Solve for CD elements
@@ -165,13 +122,13 @@ def fit_cdmatrix(x, y, lon, lat, hdr, test=False):
     p_init2 = (0, 1)
     args1 = (dx.ravel(), dy.ravel(), xp.ravel())
     args2 = (dx.ravel(), dy.ravel(), yp.ravel())
-    cd11, cd12 = optimize.leastsq(residuals, p_init1, args=args1)[0]
-    cd21, cd22 = optimize.leastsq(residuals, p_init2, args=args2)[0]
+    cd11, cd12 = scipy.optimize.leastsq(residuals, p_init1, args=args1)[0]
+    cd21, cd22 = scipy.optimize.leastsq(residuals, p_init2, args=args2)[0]
 
     return np.array([[cd11, cd12], [cd21, cd22]])
 
 
-def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None, test=False):
+def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
     """Create a FITS header from a set of points with known pixel and world
     coordinates given a celestial coordinate system and projection.
 
@@ -200,7 +157,7 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None, 
 
     """
     # Make a new header
-    hdr = fits.Header()
+    hdr = astropy.io.fits.Header()
     hdr['WCSAXES'] = 2
     hdr['CTYPE1'], hdr['CTYPE2'] = ctype1, ctype2
 
@@ -218,7 +175,7 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None, 
         hdr['CRVAL1'], hdr['CRVAL2'] = lon[idx], lat[idx]
 
     # CD matrix
-    cd = fit_cdmatrix(x, y, lon, lat, hdr, test=test)
+    cd = fit_cdmatrix(x, y, lon, lat, hdr)
     hdr['CD1_1'], hdr['CD1_2'] = cd[0, 0], cd[0, 1]
     hdr['CD2_1'], hdr['CD2_2'] = cd[1, 0], cd[1, 1]
 
@@ -245,7 +202,7 @@ def _make_header_imwcs(filename, x, y, lon, lat,
     suggesting that `make_header` is more robust.
     
     """
-    
+    import os
     import subprocess
 
     lon = lon * 24./360  # hours

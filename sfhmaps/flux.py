@@ -11,19 +11,21 @@ FSPS.
 Functions
 ---------
 
-========== ==============================================================
-`calc_mag` Calculate the magnitude of an SED in a given filter.
-`calc_sed` Calculate the SED for a binned SFH.
-`get_zmet` Return the closest FSPS `zmet` integer for the given log metal
-           abundance.
-`mag2flux` Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
-========== ==============================================================
+============ ==============================================================
+`calc_mag`   Calculate the magnitude of an SED in a given filter.
+`calc_sed`   Calculate the SED for a binned SFH.
+`get_zmet`   Return the closest FSPS `zmet` integer for the given log metal
+             abundance.
+`mag2flux`   Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
+`round_logZ` Return the closest log metal abundance value corresponding to
+             a valid choice of the FSPS zmet parameter.
+============ ==============================================================
 
 """
-import bursty_sfh as bsp  # scombine package
+import bursty_sfh  # scombine repository
 import fsps
 import numpy as np
-from sedpy import observate, attenuation
+import sedpy
 
 from . import util
 
@@ -251,7 +253,7 @@ def calc_sed(sfr, age, **kwargs):
     bin_res = kwargs.get('bin_res', 20.0)
     av, dav = kwargs.get('av', None), kwargs.get('dav', None)
     nsplit = kwargs.get('nsplit', 30)
-    dust_curve = kwargs.get('dust_curve', attenuation.cardelli)
+    dust_curve = kwargs.get('dust_curve', sedpy.attenuation.cardelli)
     fsps_kwargs = kwargs.get('fsps_kwargs', {})
 
     # To save time, create StellarPopulation only when necessary
@@ -266,7 +268,7 @@ def calc_sed(sfr, age, **kwargs):
 
     # Resample the SFH to a high time resolution
     #
-    # Notes on bsp.burst_sfh:
+    # Notes on bursty_sfh.burst_sfh:
     #
     # - `sfh` is a record array with columns 't1', 't2', and 'sfr'.
     # - Only interested in upsampling, not any burst stuff, so `f_burst`
@@ -274,11 +276,11 @@ def calc_sed(sfr, age, **kwargs):
     #
     dtypes = [('t1', 'float'), ('t2', 'float'), ('sfr', 'float')]
     sfh = np.array(zip(age[:-1], age[1:], sfr), dtypes)
-    age, sfr = bsp.burst_sfh(f_burst=0, sfh=sfh, bin_res=bin_res)[:2]
+    age, sfr = bursty_sfh.burst_sfh(f_burst=0, sfh=sfh, bin_res=bin_res)[:2]
 
     # Spectrum at each observation age
-    output = bsp.bursty_sps(age_list, age, sfr, sp, av=av, dav=dav,
-                            nsplit=nsplit, dust_curve=dust_curve)
+    output = bursty_sfh.bursty_sps(age_list, age, sfr, sp, av=av, dav=dav,
+                                   nsplit=nsplit, dust_curve=dust_curve)
     if av is None or dav is None:
         wave, spec, weights = output
         lum_ir = None
@@ -323,8 +325,8 @@ def calc_mag(wave, spec, band, dmod=None):
     Notes
     -----
 
-    .. [1] The SED data is processed using `observate.getSED`, which always
-       returns AB magnitudes.
+    .. [1] The SED data is processed using `sedpy.observate.getSED`, which
+       always returns AB magnitudes.
 
     """
     spec_list = spec
@@ -341,9 +343,9 @@ def calc_mag(wave, spec, band, dmod=None):
         band_list = [band_list]
         len_band_list = 0
 
-    band_list = observate.load_filters(band_list)
-    spec_list = spec_list * bsp.to_cgs  # erg s-1 cm-2 A-1
-    mags = observate.getSED(wave, spec_list, filterlist=band_list)  # Absolute
+    band_list = sedpy.observate.load_filters(band_list)
+    spec_list = spec_list * bursty_sfh.to_cgs  # erg s-1 cm-2 A-1
+    mags = sedpy.observate.getSED(wave, spec_list, filterlist=band_list)  # Absolute
 
     if dmod is not None:
         mags += dmod  # Apparent
@@ -516,11 +518,11 @@ def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logZ, **kwargs):
     av, dav = kwargs.get('av', None), kwargs.get('dav', None)
     av = 0 if av is None else av
     dav = 0 if dav is None else dav
-    dust_curve = kwargs.get('dust_curve', attenuation.cardelli)
+    dust_curve = kwargs.get('dust_curve', sedpy.attenuation.cardelli)
 
     specfile = make_spec_scombine(spec_dir, sfhfile, imf_type, logZ)
     combiner = scombine.Combiner(specfile, dust_law=dust_curve)
-    band_list = observate.load_filters([band])
+    band_list = sedpy.observate.load_filters([band])
     mag = combiner.combine(sfhfile, av=av, dav=dav, filterlist=band_list)[2]
     mag = float(mag)
     if dmod:
