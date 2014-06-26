@@ -564,6 +564,7 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
     dx, dy = x - hdr['CRPIX1'], y - hdr['CRPIX2']
     cd11, cd12 = util.leastsquares2d(dx, dy, xp)
     cd21, cd22 = util.leastsquares2d(dx, dy, yp)
+    ### Use scipy.optimize.leastsq instead?
 
     return np.array([[cd11, cd12], [cd21, cd22]])
 

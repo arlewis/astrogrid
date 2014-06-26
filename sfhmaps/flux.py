@@ -31,6 +31,59 @@ from . import util
 CURRENT_SP = []  # Container for fsps.StellarPopulation
 
 
+def round_logZ(logZ):
+    """Return the closest log metal abundance value corresponding to a
+    valid choice of the FSPS zmet parameter.
+
+    Parameters
+    ----------
+    logZ : float
+        Log metal abundance, log(Z/Zsun).
+
+    Returns
+    -------
+    float
+
+    Notes
+    -----
+    `zmet` parameter values vs. metal abundance for Padova isochrones and
+    BaSeL stellar library from the FSPS manual (Zsun = 0.0190):
+
+    ==== ====== ===========
+    zmet Z      log(Z/Zsun)
+    ==== ====== ===========
+       1 0.0002       -1.98
+       2 0.0003       -1.80
+       3 0.0004       -1.68
+       4 0.0005       -1.58
+       5 0.0006       -1.50
+       6 0.0008       -1.38
+       7 0.0010       -1.28
+       8 0.0012       -1.20
+       9 0.0016       -1.07
+      10 0.0020       -0.98
+      11 0.0025       -0.89
+      12 0.0031       -0.79
+      13 0.0039       -0.69
+      14 0.0049       -0.59
+      15 0.0061       -0.49
+      16 0.0077       -0.39
+      17 0.0096       -0.30
+      18 0.0120       -0.20
+      19 0.0150       -0.10
+      20 0.0190       +0.00
+      21 0.0240       +0.10
+      22 0.0300       +0.20
+    ==== ====== ===========
+
+    """
+    fsps_logZ = np.array([-1.98, -1.80, -1.68, -1.58, -1.50, -1.38, -1.28,
+                          -1.20, -1.07, -0.98, -0.89, -0.79, -0.69, -0.59,
+                          -0.49, -0.39, -0.30, -0.20, -0.10, 0.00, 0.10, 0.20])
+    i = np.abs(logZ - fsps_logZ).argmin()
+    return fsps_logZ[i]
+
+
 def get_zmet(logZ):
     """Return the closest FSPS `zmet` integer for the given log metal
     abundance.
@@ -38,7 +91,7 @@ def get_zmet(logZ):
     Parameters
     ----------
     logZ : float
-        Log metal abundance.
+        Log metal abundance, log(Z/Zsun).
 
     Returns
     -------

@@ -4,17 +4,19 @@
 `sfhmaps.util`
 ==============
 
-General use utilities.
+General utilities.
 
 
 Functions
 ---------
 
-============ =========================================================
-`islistlike` True if the object is iterable like a list and is *not* a
-             string.
-`isstring`   True if the object is a string.
-============ =========================================================
+================ ==========================================================
+`islistlike`     True if the object is iterable like a list and is *not* a
+                 string.
+`isstring`       True if the object is a string.
+`leastsquares2d` Use 2d least squares minimization to find the best-fit a
+                 and b for zi = a*xi + b*yi.
+================ ==========================================================
 
 """
 import os
