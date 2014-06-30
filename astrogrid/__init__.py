@@ -21,6 +21,7 @@ values could be anything.
   `python-fsps <https://github.com/dfm/python-fsps>`_
   (or `this <https://github.com/bd-j/python-fsps>`_ fork)
 - `numpy <http://www.numpy.org>`_
+- `scipy <http://www.scipy.org>`_
 - `scombine <https://github.com/bd-j/scombine>`_
 - `sedpy <https://github.com/bd-j/sedpy>`_
 
