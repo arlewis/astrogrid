@@ -25,7 +25,8 @@ Functions
 import bursty_sfh  # scombine repository
 import fsps
 import numpy as np
-import sedpy
+import sedpy.attentuation
+import sedpy.observate
 
 from . import util
 
