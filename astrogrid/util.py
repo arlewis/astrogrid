@@ -1,8 +1,8 @@
 """
 
-==============
-`sfhmaps.util`
-==============
+================
+`astrogrid.util`
+================
 
 General utilities.
 

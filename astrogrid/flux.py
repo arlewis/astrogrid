@@ -1,8 +1,8 @@
 """
 
-==============
-`sfhmaps.flux`
-==============
+================
+`astrogrid.flux`
+================
 
 Utilities for calculating integrated SEDs and magnitudes from SFHs using
 FSPS.
@@ -225,7 +225,7 @@ def calc_sed(sfr, age, **kwargs):
         array of spectral flux values (Lsun A-1) at each wavelength. If
         `age_observe` is a list, then the spectrum array has shape
         (len(age_observe), len(wave)), otherwise it has shape (len(wave),).
-        
+
     Notes
     -----
 

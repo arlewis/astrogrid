@@ -1,8 +1,8 @@
 """
 
-=============
-`sfhmaps.wcs`
-=============
+===============
+`astrogrid.wcs`
+===============
 
 Utilities for working with world coordinate systems.
 
