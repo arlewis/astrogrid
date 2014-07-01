@@ -13,6 +13,7 @@ Constants
 
 ============ =================================================
 `CURRENT_SP` Container for `fsps.StellarPopulation` instances.
+`IMF_TYPE`   Dictionary of FSPS imf_type parameter values.
 ============ =================================================
 
 
