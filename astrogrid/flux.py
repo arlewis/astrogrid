@@ -48,6 +48,16 @@ saved here so that they can be reused later to save time.
 """
 
 
+IMF_TYPE = {
+    'Salpeter': 0,
+    'Chabrier': 1,
+    'Kroupa': 2,
+    'van Dokkum': 3,
+    'Dave': 4,
+    }
+"""Dictionary of FSPS imf_type parameter values."""
+
+
 def round_logz(logz):
     """Return the closest log metal abundance value corresponding to a
     valid choice of the FSPS zmet parameter.
