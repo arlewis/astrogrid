@@ -8,6 +8,14 @@ Utilities for calculating integrated SEDs and magnitudes from SFHs using
 FSPS.
 
 
+Constants
+---------
+
+============ =================================================
+`CURRENT_SP` Container for `fsps.StellarPopulation` instances.
+============ =================================================
+
+
 Functions
 ---------
 
@@ -31,7 +39,13 @@ import sedpy.observate
 from . import util
 
 
-CURRENT_SP = []  # Container for fsps.StellarPopulation
+CURRENT_SP = []
+"""Container for `fsps.StellarPopulation` instances.
+
+Creating `fsps.StellarPopulation` instances can take some time, so they are
+saved here so that they can be reused later to save time.
+
+"""
 
 
 def round_logz(logz):
