@@ -67,7 +67,7 @@ class Grid(object):
     args
         List of tuples, one per cell, containing the arguments for `func`.
         The tuples are ordered as a list of cells from a flattened grid
-        (e.g., `np.ravel()`). The list is automatically exteneded with
+        (e.g., `numpy.ravel`). The list is automatically exteneded with
         Nones if it is too short for the given grid shape, or truncated if
         it is too long.
     kwargs
@@ -82,10 +82,10 @@ class Grid(object):
     -------
     update
 
-
     """
 
-    def __init__(self, shape, func, args, kwargs=None, fill=np.nan, update=False):
+    def __init__(self, shape, func, args, kwargs=None, fill=np.nan,
+                 update=False):
         self.shape = shape
         self.func = func
         self.args = args
@@ -97,6 +97,8 @@ class Grid(object):
 
         if update:
             self.update()
+
+        return
 
     @property
     def nrow(self):
@@ -216,6 +218,8 @@ class Grid(object):
         for i in i_list:
             self._data_list[i] = func(self.args[i], self.kwargs[i])
 
+        return
+
     def update(self, where=None):
         """Update the grid to the values of the current attributes.
 
@@ -230,9 +234,14 @@ class Grid(object):
             list of row indices followed by a list of column indices. All
             cells are updated if None (default).
 
+        Returns
+        -------
+        None
+
         """
         self.args = self._check_list(self.args)
         self.kwargs = self._check_list(self.kwargs)
         self._data_list = self._check_data(self._data_list)
         self._apply_func(where=where)
         self._data_grid = self._data_list.reshape(self.shape)
+        return

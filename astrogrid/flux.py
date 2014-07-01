@@ -17,7 +17,7 @@ Functions
 `get_zmet`   Return the closest FSPS `zmet` integer for the given log metal
              abundance.
 `mag2flux`   Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
-`round_logZ` Return the closest log metal abundance value corresponding to
+`round_logz` Return the closest log metal abundance value corresponding to
              a valid choice of the FSPS zmet parameter.
 ============ ==============================================================
 
@@ -34,13 +34,13 @@ from . import util
 CURRENT_SP = []  # Container for fsps.StellarPopulation
 
 
-def round_logZ(logZ):
+def round_logz(logz):
     """Return the closest log metal abundance value corresponding to a
     valid choice of the FSPS zmet parameter.
 
     Parameters
     ----------
-    logZ : float
+    logz : float
         Log metal abundance, log(Z/Zsun).
 
     Returns
@@ -80,20 +80,20 @@ def round_logZ(logZ):
     ==== ====== ===========
 
     """
-    fsps_logZ = np.array([-1.98, -1.80, -1.68, -1.58, -1.50, -1.38, -1.28,
+    fsps_logz = np.array([-1.98, -1.80, -1.68, -1.58, -1.50, -1.38, -1.28,
                           -1.20, -1.07, -0.98, -0.89, -0.79, -0.69, -0.59,
                           -0.49, -0.39, -0.30, -0.20, -0.10, 0.00, 0.10, 0.20])
-    i = np.abs(logZ - fsps_logZ).argmin()
-    return fsps_logZ[i]
+    i = np.abs(logz - fsps_logz).argmin()
+    return fsps_logz[i]
 
 
-def get_zmet(logZ):
+def get_zmet(logz):
     """Return the closest FSPS `zmet` integer for the given log metal
     abundance.
 
     Parameters
     ----------
-    logZ : float
+    logz : float
         Log metal abundance, log(Z/Zsun).
 
     Returns
@@ -158,7 +158,7 @@ def get_zmet(logZ):
         [22, 0.20]
         ])
 
-    i = np.abs(logZ - zmet_lookup[:,1]).argmin()
+    i = np.abs(logz - zmet_lookup[:,1]).argmin()
     zmet = int(zmet_lookup[i,0])
 
     return zmet
@@ -175,7 +175,7 @@ def calc_sed(sfr, age, **kwargs):
     `calc_sed`. If needed, the current `fsps.StellarPopulation` instance
     can be cleared with ``CURRENT_SP.pop(0)``.
 
-    All stellar population synthesis is performed under the hood using FSPS
+    Under the hood, all stellar population synthesis is done using FSPS
     with the Padova isochrones and BaSeL stellar library. `python-fsps`
     provides the python interface, and integrated SEDs are computed from
     input SFHs using the `scombine` and `sedpy` packages. This function
@@ -241,7 +241,7 @@ def calc_sed(sfr, age, **kwargs):
        summing the pieces back together.
 
     """
-    if len(age)==2 and util.islistlike(age[0]):
+    if len(age) == 2 and util.islistlike(age[0]):
         age = np.append(age[0], age[1][-1])  # One array of bin edges
 
     age_list = kwargs.get('age_observe', 1)
@@ -310,9 +310,9 @@ def calc_mag(wave, spec, band, dmod=None):
         magnitude. See `fsps.find_filter` or `fsps.fsps.FILTERS` for valid
         filter names.
     dmod : float, optional
-        Distance modulus used to calculate apparent magnitudes. If given,
-        the returned magnitudes are apparent instead of absolute. Default
-        is None.
+        Distance modulus used to calculate apparent magnitudes which are
+        returned instead of absolute magnitudes. Default is None
+        (magnitudes are absolute).
 
     Returns
     -------
@@ -346,7 +346,8 @@ def calc_mag(wave, spec, band, dmod=None):
 
     band_list = sedpy.observate.load_filters(band_list)
     spec_list = spec_list * bursty_sfh.to_cgs  # erg s-1 cm-2 A-1
-    mags = sedpy.observate.getSED(wave, spec_list, filterlist=band_list)  # Absolute
+    # Absolute
+    mags = sedpy.observate.getSED(wave, spec_list, filterlist=band_list)
 
     if dmod is not None:
         mags += dmod  # Apparent
@@ -356,7 +357,7 @@ def calc_mag(wave, spec, band, dmod=None):
     else:
         if len_band_list == 1:
             mags = np.expand_dims(mags, 1)
-        if len_age_list == 1:
+        if len_spec_list == 1:
             mags = np.expand_dims(mags, 0)
 
     return mags
@@ -405,7 +406,7 @@ def mag2flux(mag, band):
         Input AB magnitude(s) in the given filter.
     band : str
         Name of the filter corresponding to `mag`. See `fsps.find_filter`
-        or `fsps.fsps.FILTERS` for valid filter names.       
+        or `fsps.fsps.FILTERS` for valid filter names.
 
     Returns
     -------
@@ -425,7 +426,7 @@ def mag2flux(mag, band):
 
 # Deprecated?
 # -----------
-def make_spec_scombine(spec_dir, sfhfile, imf_type, logZ):
+def make_spec_scombine(spec_dir, sfhfile, imf_type, logz):
     """Create a basis file for `scombine.Combiner`.
 
     The file is only created if one does not already exist for the given
@@ -441,7 +442,7 @@ def make_spec_scombine(spec_dir, sfhfile, imf_type, logZ):
         two columns are used.
     imf_type : int
         IMF (see the FSPS manual).
-    logZ : float
+    logz : float
         Metallicity, log(Z/Zsun).
 
     Returns
@@ -454,12 +455,12 @@ def make_spec_scombine(spec_dir, sfhfile, imf_type, logZ):
 
     outroot = os.path.join(spec_dir, 'spec')
     filename = scombine.generate_basis(
-                            sfhfile, zmet=10**logZ, imf_type=imf_type,
-                            t_lookback=0, outroot=outroot)[0]
+        sfhfile, zmet=10**logz, imf_type=imf_type, t_lookback=0,
+        outroot=outroot)[0]
     return filename
 
 
-def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logZ, **kwargs):
+def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logz, **kwargs):
     """Calculate the magnitude of a binned SFH in a given filter.
 
     The `scombine` module is used, which depends on having the proper
@@ -479,12 +480,12 @@ def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logZ, **kwargs):
         Path to the directory containing the desired basis file.
     imf_type : int
         IMF (see the FSPS manual). Used to select the basis file.
-    logZ : float
+    logz : float
         Metallicity, log(Z/Zsun). Used to select the basis file.
     dmod : float, optional
-        Distance modulus used to calculate apparent magnitudes. If given,
-        the returned magnitudes are apparent instead of absolute. Default
-        is None.
+        Distance modulus used to calculate apparent magnitudes which are
+        returned instead of absolute magnitudes. Default is None
+        (magnitudes are absolute).
     av, dav : float, optional
         Foreground and differential V-band extinction parameters. Default
         is None (0). [1]_
@@ -521,7 +522,7 @@ def calc_mag_scombine(sfhfile, band, spec_dir, imf_type, logZ, **kwargs):
     dav = 0 if dav is None else dav
     dust_curve = kwargs.get('dust_curve', sedpy.attenuation.cardelli)
 
-    specfile = make_spec_scombine(spec_dir, sfhfile, imf_type, logZ)
+    specfile = make_spec_scombine(spec_dir, sfhfile, imf_type, logz)
     combiner = scombine.Combiner(specfile, dust_law=dust_curve)
     band_list = sedpy.observate.load_filters([band])
     mag = combiner.combine(sfhfile, av=av, dav=dav, filterlist=band_list)[2]

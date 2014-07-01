@@ -35,31 +35,50 @@ the whole grid. The ultimate goal is to use these SFHs to construct an
 image of modeled flux.
 
 The first step is to write a function that calculates flux from an input
-SFH. The `astrogrid.flux` module provides some tools to help do this, but
-suppose the function looks like,
+SFH. The `astrogrid.flux` module provides some tools to help do this (note
+that the `flux` module is really just a convenience frontend for
+`python-fsps`, `scombine`, and `sedpy`):
 
 >>> import astrogrid
 >>> def calc_flux(sfhfile, band, distance, extinction=None):
 ...     # Code to calculate flux in the band from the SFH data in stored in
 ...     # sfhfile, assuming a certain distance and an optional amount of
 ...     # extinction.
-...     age, sfr = process_sfh(sfhfile)
+...     age, sfr = some_function_to_process_the_sfh(sfhfile)
 ...     wave, spec = astrogrid.flux.calc_sed(sfr, age, av=extinction)
 ...     mag = astrogrid.flux.calc_mag(wave, spec, band, dmod=distance):
 ...     flux = astrogrid.flux.mag2flux(mag, band)
 ...     return flux
 
 Now create a list of arguments and a list of keyword arguments to pass to
-`calc_flux` for each cell in the grid. The order of the cells should be
-that of a flattened 2d `numpy` array (e.g., `np.ravel`). Assuming the cells
-are numbered from 1 to 12 and cell 1 goes in the first row, first column of
-the grid,
+`calc_flux` for each cell in the grid. The grid is represented by a 2d
+`numpy` array, and it is always filled starting from row 0, column 0, then
+going through the columns before moving to the next row, and so on. The
+order of the cell arguments should therefore correspond to a flattened 2d
+array (e.g., `numpy.ravel`). For this example, assume that the cells are
+labeld "a" through "l" arranged in the following way::
 
->>> file_list = ['sfhfile01', 'sfhfile02', ... 'sfhfile12']
+     +---+---+---+---+
+    2| i | j | k | l |
+  ^  +---+---+---+---+
+  r 1| e | f | g | h |
+  o  +---+---+---+---+
+  w 0| a | b | c | d |
+     +---+---+---+---+
+       0   1   2   3
+       column >
+
+The chosen arrangement is arbitrary and is essentially a matter of
+convenience. For example, the rows and columns could have been reversed so
+that cells "a" and "l" are at 2,3 and 0,0, respectively. With the
+arrangement above, the arguments are listed such that the cells are in
+alphabetical order:
+
+>>> file_list = ['sfhfile_a', 'sfhfile_b', ... 'sfhfile_l']
 >>> band_list = ['galex_fuv'] * len(file_list)
 >>> distance_list = [distance] * len(file_list)
 >>> args = zip(file_list, band_list, distance_list)
->>> extinction_vals = [av01, av02, ... av12]
+>>> extinction_vals = [av_a, av_b, ... av_l]
 >>> kwargs = [{'extinction': av} for av in av_list]
 
 Next create a `Grid` instance and calculate the grid values:
@@ -71,24 +90,26 @@ Next create a `Grid` instance and calculate the grid values:
 array([[...
 
 Note that the grid values are not actually calculated until the `update`
-method is called. The grid attributes can be modified in needed. For
-example, suppose a different extinction value should be used for cell 4:
+method is called. The grid attributes can be modified if needed. For
+example, suppose a different extinction value should be used for cell "d":
 
->>> grid.kwargs[3]['extinction'] = av04_new
+>>> grid.kwargs[3]['extinction'] = av_d_new
 
-Also suppose that `calc_flux` is very expensive and recomputing the entire
-grid would take a long time. The `update` method has a `where` option to
-compute only specific cells for exactly this purpose. Cell 4 can be indexed
-using either ``where=3`` (list index) or ``where=(0, 3)`` (grid indices).
+Also suppose that running `calc_flux` is very expensive and recomputing the
+entire grid would take a long time. The `update` method has a `where`
+option to compute only specific cells for exactly this purpose. Cell "d"
+can be indexed using either ``where=3`` (list index) or ``where=(0, 3)``
+(grid indices):
 
 >>> grid.update(where=3)  # or grid.update(where=(0, 3))
 
-The array in the `data_grid` attribute contains the desired image data, but
-it would be nice to have an accompanying header with WCS information so
-that, for example, the image could later be combined with other similar
+The array in the `data_grid` attribute now contains the desired image data.
+It would be nice, however, to have an accompanying header with WCS
+information so that the image could later be combined with other similar
 images to produce a mosaic. The `astrogrid.wcs` module can fit a WCS to the
-grid given the coordinates of a set of points. If the RA and dec of the
-cell corners have been measured, then obtaining a header is easy:
+grid given the coordinates of a set of points. If the RA and dec
+coordinates of the cell corners have been measured, then obtaining a header
+is easy:
 
 >>> x, y = grid.edges  # pixel coordinates of the cell corners
 >>> hdr = astrogrid.wcs.make_header(x, y, RA, dec)

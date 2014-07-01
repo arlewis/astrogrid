@@ -21,12 +21,16 @@ Functions
 =============== ===========================================================
 
 """
-import astropy.coordinates, astropy.io.fits, astropy.units, astropy.wcs
+import astropy.coordinates
+import astropy.io.fits
+import astropy.units
+import astropy.wcs
 import numpy as np
 import scipy.optimize
 
 
-def calc_pixscale(hdr, ref='crpix', units=(astropy.units.deg, astropy.units.deg)):
+def calc_pixscale(hdr, ref='crpix',
+                  units=(astropy.units.deg, astropy.units.deg)):
     """Calculate the x and y pixel scales from the WCS information in a
     FITS header.
 
@@ -97,7 +101,8 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
 
     """
     def residuals(p, dx, dy, ip):
-        # i represents x or y; xp - (cd11*dx + cd12*dy) and yp - (cd21*dx + cd22*dy)
+        # i represents x or y;
+        # xp - (cd11*dx + cd12*dy) and yp - (cd21*dx + cd22*dy)
         cdi1, cdi2 = p
         err = ip - (cdi1*dx + cdi2*dy)
         return err
@@ -128,7 +133,8 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
     return np.array([[cd11, cd12], [cd21, cd22]])
 
 
-def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
+def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN',
+                ref=None):
     """Create a FITS header from a set of points with known pixel and world
     coordinates given a celestial coordinate system and projection.
 
@@ -185,8 +191,7 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
 
 # Tests
 # -----
-def _make_header_imwcs(filename, x, y, lon, lat,
-                       ctype1='RA---TAN', ctype2='DEC--TAN', ref=None):
+def _make_header_imwcs(filename, x, y, lon, lat):
     """Create a FITS header using imwcs; a sanity check for `make_header`.
 
     The program requires an existing .fits file (the WCS in the header is
@@ -200,14 +205,14 @@ def _make_header_imwcs(filename, x, y, lon, lat,
     however it produced a fairly inaccurate solution for brick 12
     (discrepancies up to 1-2 pixels between input and output x,y)
     suggesting that `make_header` is more robust.
-    
+
     """
     import os
     import subprocess
 
     lon = lon * 24./360  # hours
     coords = []
-    for xp, yp, RA, DEC in zip(x.ravel(), x.ravel(), lon.ravel(), lat.ravel()):
+    for xp, yp, RA, DEC in zip(x.ravel(), y.ravel(), lon.ravel(), lat.ravel()):
         h = int(RA)
         m = int((RA - h) * 60)
         s = (((RA - h) * 60) - m) * 60
@@ -218,7 +223,8 @@ def _make_header_imwcs(filename, x, y, lon, lat,
         s = (((DEC - d) * 60) - m) * 60
         dms = '{0:02d} {1:d} {2:8.5f}'.format(d, m, s)
 
-        cstr = '{0:15.8f} {1:15.8f}    {2:s}    {3:s}\n'.format(xp, yp, hms, dms)
+        cstr = ('{0:15.8f} {1:15.8f}    {2:s}    {3:s}\n'
+                .format(xp, yp, hms, dms))
         coords.append(cstr)
 
     dirname = os.path.dirname(filename)

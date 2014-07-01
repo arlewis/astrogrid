@@ -17,8 +17,6 @@ Functions
 ================ ==========================================================
 
 """
-import os
-import errno
 
 
 def isstring(obj):
