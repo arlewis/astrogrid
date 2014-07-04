@@ -29,8 +29,7 @@ import numpy as np
 import scipy.optimize
 
 
-def calc_pixscale(hdr, ref='crpix',
-                  units=(astropy.units.deg, astropy.units.deg)):
+def calc_pixscale(hdr, ref='crpix', units=None):
     """Calculate the x and y pixel scales from the WCS information in a
     FITS header.
 
@@ -46,8 +45,8 @@ def calc_pixscale(hdr, ref='crpix',
         reference pixel instead.
     units : tuple, optional
         The units of the longitude and latitude coordinates as a tuple of
-        `astropy.units.core.Unit` instances. Both units are set to
-        `astropy.units.deg` by default.
+        `astropy.units.core.Unit` instances. If None (default), then the
+        units will be determined from `hdr`.
 
     Returns
     -------
@@ -63,6 +62,14 @@ def calc_pixscale(hdr, ref='crpix',
         x, y = hdr['naxis1']/2, hdr['naxis2']/2
     else:
         x, y = ref
+
+    if units is None:
+        # astropy.unit.Unit instances for astropy.wcs.WCS.wcs.cunit keywords
+        unit_dict = {
+            'deg': astropy.units.deg,
+            }
+
+        units = tuple(unit_dict[u] for u in wcs.wcs.cunit)
 
     lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
     # Makes no difference whether ICRS, Galactic, AltAz, etc.
