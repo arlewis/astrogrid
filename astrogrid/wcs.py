@@ -64,12 +64,7 @@ def calc_pixscale(hdr, ref='crpix', units=None):
         x, y = ref
 
     if units is None:
-        # astropy.unit.Unit instances for astropy.wcs.WCS.wcs.cunit keywords
-        unit_dict = {
-            'deg': astropy.units.deg,
-            }
-
-        units = tuple(unit_dict[u] for u in wcs.wcs.cunit)
+        units = wcs.wcs.cunit
 
     lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
     # Makes no difference whether ICRS, Galactic, AltAz, etc.

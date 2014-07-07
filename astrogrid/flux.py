@@ -37,8 +37,6 @@ import numpy as np
 import sedpy.attenuation
 import sedpy.observate
 
-from . import util
-
 
 CURRENT_SP = []
 """Container for `fsps.StellarPopulation` instances.
@@ -266,13 +264,18 @@ def calc_sed(sfr, age, **kwargs):
        summing the pieces back together.
 
     """
-    if len(age) == 2 and util.islistlike(age[0]):
-        age = np.append(age[0], age[1][-1])  # One array of bin edges
+    if len(age) == 2:
+        try:
+            age = np.append(age[0], age[1][-1])  # One array of bin edges
+        except (TypeError, IndexError):
+            # Probably not a length-2 sequence of sequences
+            pass
 
     age_list = kwargs.get('age_observe', 1)
-    if util.islistlike(age_list):
+    try:
         len_age_list = len(age_list)
-    else:
+    except TypeError:
+        # age_list is a single value
         age_list = [age_list]
         len_age_list = 0
 
@@ -362,12 +365,11 @@ def calc_mag(wave, spec, band, dmod=None):
     else:
         len_spec_list = len(spec_list)
 
-    band_list = band
-    if util.islistlike(band_list):
-        len_band_list = len(band_list)
-    else:
+    if isinstance(band_list, basestring):
         band_list = [band_list]
         len_band_list = 0
+    else:
+        len_band_list = len(band_list)
 
     band_list = sedpy.observate.load_filters(band_list)
     spec_list = spec_list * bursty_sfh.to_cgs  # erg s-1 cm-2 A-1

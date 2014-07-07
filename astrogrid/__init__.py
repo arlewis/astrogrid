@@ -129,7 +129,6 @@ Modules
 ====== ==================================================================
 `flux` Utilities for calculating integrated SEDs and magnitudes from SFHs
        using FSPS.
-`util` General utilities.
 `wcs`  Utilities for working with world coordinate systems.
 ====== ==================================================================
 
@@ -148,7 +147,6 @@ Module Index
 
 - `astrogrid.flux`
 - `astrogrid.grid`
-- `astrogrid.util`
 - `astrogrid.wcs`
 
 
@@ -159,5 +157,4 @@ Module Index
 """
 from . import flux
 from .grid import Grid
-from . import util
 from . import wcs
