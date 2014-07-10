@@ -374,17 +374,18 @@ def calc_mag(wave, spec, band, dmod=None):
        always returns AB magnitudes.
 
     """
-    spec_list = spec
-    if spec_list.ndim == 1:
-        spec_list = np.expand_dims(spec_list, 0)
+    if spec.ndim == 1:
+        spec_list = np.expand_dims(spec, 0)
         len_spec_list = 0
     else:
+        spec_list = spec
         len_spec_list = len(spec_list)
 
-    if isinstance(band_list, basestring):
-        band_list = [band_list]
+    if isinstance(band, basestring):
+        band_list = [band]
         len_band_list = 0
     else:
+        band_list = band
         len_band_list = len(band_list)
 
     band_list = sedpy.observate.load_filters(band_list)
