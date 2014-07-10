@@ -14,16 +14,30 @@ file. The main focus of the package is on calculating broadband fluxes from
 star formation history (SFH) data, but the input data and calculated grid
 values could be anything.
 
-`astrogrid` requires the following packages:
+`astrogrid` requires the following core packages:
 
-- `astropy <http://www.astropy.org>`_
-- `FSPS <http://people.ucsc.edu/~conroy/FSPS.html>`_ and
-  `python-fsps <https://github.com/dfm/python-fsps>`_
-  (or `this <https://github.com/bd-j/python-fsps>`_ fork)
 - `numpy <http://www.numpy.org>`_
-- `scipy <http://www.scipy.org>`_
-- `scombine <https://github.com/bd-j/scombine>`_
-- `sedpy <https://github.com/bd-j/sedpy>`_
+
+Supporting modules are imported if the required packages are installed:
+
+- `astrogrid.flux`:
+
+  - `FSPS <http://people.ucsc.edu/~conroy/FSPS.html>`_ and
+    `python-fsps <https://github.com/dfm/python-fsps>`_
+    (or `this <https://github.com/bd-j/python-fsps>`_ fork)
+  - `scombine <https://github.com/bd-j/scombine>`_
+  - `sedpy <https://github.com/bd-j/sedpy>`_
+
+- `astrogrid.mwe`: all `astrogrid.wcs` dependencies, plus,
+
+  - `astropy <http://www.astropy.org>`_
+  - `Montage <http://montage.ipac.caltech.edu>`_ and
+    `montage_wrapper <http://montage-wrapper.readthedocs.org>`_
+
+- `astrogrid.wcs`:
+
+  - `astropy <http://www.astropy.org>`_
+  - `scipy <http://www.scipy.org>`_
 
 
 Example
@@ -122,13 +136,27 @@ an image in FITS format:
 >>> hdu = astropy.io.fits.PrimaryHDU(data=grid.data_grid, header=hdr)
 >>> hdu.writeto(filename)
 
+A set of such modeled flux images can be stitched together as a mosaic
+using the `astrogrid.mwe` ("montage-wrapper extension") module, which
+provides a wrapper for `montage_wrapper.mosaic`. Of course, the
+`montage_wrapper` package could always be used directly. Either way,
+mosaicking requires a working installation of Montage and the
+`montage_wrapper` package. Assuming ``input_files`` is a list of paths to
+the individual flux images, the following command creates a mosaic at
+``mosaic_file`` and a directory of intermediate files in ``work_dir``:
+
+>>> astrogrid.mwe.mosaic(input_files, mosaic_file, work_dir)
+
 
 Modules
 -------
+These support modules are only imported if their required dependencies are
+available.
 
 ====== ==================================================================
 `flux` Utilities for calculating integrated SEDs and magnitudes from SFHs
        using FSPS.
+`mwe`  Mosaicking utilities.
 `wcs`  Utilities for working with world coordinate systems.
 ====== ==================================================================
 
@@ -147,6 +175,7 @@ Module Index
 
 - `astrogrid.flux`
 - `astrogrid.grid`
+- `astrogrid.mwe`
 - `astrogrid.wcs`
 
 
@@ -155,6 +184,19 @@ Module Index
 .. |Grid| replace:: `~astrogrid.grid.Grid`
 
 """
-from . import flux
 from .grid import Grid
-from . import wcs
+
+try:
+    from . import flux
+except ImportError:
+    pass
+
+try:
+    from . import mwe
+except ImportError:
+    pass
+
+try:
+    from . import wcs
+except ImportError:
+    pass
