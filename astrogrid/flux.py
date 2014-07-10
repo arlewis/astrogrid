@@ -11,10 +11,11 @@ FSPS.
 Constants
 ---------
 
-============ =================================================
+============ ============================================================
 `CURRENT_SP` Container for `fsps.StellarPopulation` instances.
 `IMF_TYPE`   Dictionary of FSPS imf_type parameter values.
-============ =================================================
+`DUST_CURVE` Dictionary of dust curve functions from `sedpy.attenuation`.
+============ ============================================================
 
 
 Functions
@@ -55,6 +56,18 @@ IMF_TYPE = {
     'Dave': 4,
     }
 """Dictionary of FSPS imf_type parameter values."""
+
+
+DUST_CURVE = {
+    'powerlaw': sedpy.attenuation.powerlaw,
+    'calzetti': sedpy.attenuation.calzetti,
+    'chevallard': sedpy.attenuation.chevallard,
+    'conroy': sedpy.attenuation.conroy,
+    'cardelli': sedpy.attenuation.cardelli,
+    'smc': sedpy.attenuation.smc,
+    'lmc': sedpy.attenuation.lmc,
+    }
+"""Dictionary of dust curve functions from `sedpy.attenuation`."""
 
 
 def round_logz(logz):
@@ -233,11 +246,12 @@ def calc_sed(sfr, age, **kwargs):
         is None (0). [1]_
     nsplit : int, optional
         Number of pieces in which to split the spectrum. Default is 30. [1]_
-    dust_curve : function, optional
-        Function that returns ``A_lambda/A_V`` (extinction normalized to
-        the total V-band extinction) for a given array of input wavelengths
-        in Angstroms (see the `attenuation` module in `sedpy`). Default is
-        `sedpy.attentuation.cardelli`. [1]_
+    dust_curve : string or function, optional
+        The name of a key in the `DUST_TYPE`. Default is 'cardelli'. May
+        instead give a function that returns ``A_lambda/A_V`` (extinction
+        normalized to the total V-band extinction) for a given array of
+        input wavelengths in Angstroms (see the `attenuation` module in
+        `sedpy`). [1]_
     fsps_kwargs : dict, optional
         Dictionary of keyword arguments for `fsps.StellarPopulation`.
         Default is an empty dictionary. 'sfh'=0 will always be used.
@@ -282,7 +296,9 @@ def calc_sed(sfr, age, **kwargs):
     bin_res = kwargs.get('bin_res', 20.0)
     av, dav = kwargs.get('av', None), kwargs.get('dav', None)
     nsplit = kwargs.get('nsplit', 30)
-    dust_curve = kwargs.get('dust_curve', sedpy.attenuation.cardelli)
+    dust_curve = kwargs.get('dust_curve', 'cardelli')
+    if isinstance(dust_curve, basestring):
+        dust_curve = DUST_CURVE[dust_curve]
     fsps_kwargs = kwargs.get('fsps_kwargs', {})
 
     # To save time, create StellarPopulation only when necessary
