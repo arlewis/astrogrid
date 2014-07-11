@@ -125,9 +125,12 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
                        if os.path.splitext(basename)[1] == '.fits']
 
     # Create working directory
-    if os.path.exists(work_dir):
+    try:
+        os.makedirs(work_dir)
+    except OSError:
         shutil.rmtree(work_dir)
-    os.makedirs(work_dir)
+        os.makedirs(work_dir)
+
 
     # Create input directory and populate it
     input_dir = os.path.join(work_dir, 'input')
@@ -161,6 +164,7 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
     kwargs['header'] = None if header and full else header
     kwargs['work_dir'] = os.path.join(work_dir, 'montage')
     kwargs['imglist'] = None
+    kwargs['cleanup'] = False
     montage.mosaic(input_dir, output_dir, **kwargs)
     mtgmosaic_file = os.path.join(output_dir, 'mosaic.fits')
     mtgarea_file = os.path.join(output_dir, 'mosaic_area.fits')
@@ -178,9 +182,10 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
 
     # Write final mosaic, converting back into total flux if needed
     dirname = os.path.dirname(mosaic_file)
-    safe_mkdir(dirname)
-    if os.path.exists(mosaic_file):
-        os.remove(mosaic_file)
+    try:
+        os.makedirs(dirname)
+    except OSError:
+        pass
     if postprocess or not density:
         # Create new file
         data, hdr = astropy.io.fits.getdata(mtgmosaic_file, header=True)
@@ -193,13 +198,21 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
             data, hdr = postprocess(data, hdr)
         # Write
         hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
-        hdu.writeto(mosaic_file)
+        try:
+            hdu.writeto(mosaic_file)
+        except IOError:
+            os.remove(mosaic_file)
+            hdu.writeto(mosaic_file)
     elif cleanup:
         # Move existing file
         os.rename(mtgmosaic_file, mosaic_file)
     else:
         # Symlink existing file
-        os.symlink(mtgmosaic_file, mosaic_file)
+        try:
+            os.symlink(mtgmosaic_file, mosaic_file)
+        except OSError:
+            os.remove(mosaic_file)
+            os.symlink(mtgmosaic_file, mosaic_file)
 
     # Cleanup
     if cleanup:
