@@ -8,9 +8,8 @@ Create 2d grids from flattened data.
 
 This module defines the `Grid` class, which takes an unstructured set of
 data, performs a user-defined calculation on it, and arranges the results
-as a grid of the desired shape. The resulting grid is a 2d `numpy` array,
-so it can easily be processed further, plotted, or written to an image
-file.
+as a grid of the desired shape. The resulting grid is a 2d ndarray, so it
+can easily be processed further, plotted, or written to an image file.
 
 
 Classes
@@ -29,7 +28,7 @@ class Grid(object):
     """Build a grid from flattened data.
 
     A grid is defined by a shape, a function, and list of arguments for the
-    grid cells. The grid itself is represented by a 2d array of the given
+    grid cells. The grid itself is represented by a 2d ndarray of the given
     shape (the `data` attribute), where the value of each cell is computed
     using the function and the cell's arguments. Grid attributes can be
     modified freely. The grid's data array is only updated when the

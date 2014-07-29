@@ -67,8 +67,12 @@ def calc_pixscale(hdr, ref='crpix', units=None):
         units = wcs.wcs.cunit
 
     lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
-    # Makes no difference whether ICRS, Galactic, AltAz, etc.
-    points = astropy.coordinates.ICRS(lon, lat, unit=units)
+    if astropy.version.minor < 4:
+        # Makes no difference whether ICRS, Galactic, AltAz, etc.
+        points = astropy.coordinates.ICRSlon, lat, unit=units)
+    else:
+        # Makes no difference whether ICRS, Galactic, AltAz, etc.
+        points = astropy.coordinates.SkyCoord(lon, lat, 'icrs', unit=units)
     dxy = astropy.coordinates.Angle([points[0].separation(points[1]),
                                      points[0].separation(points[2])])
     return dxy
@@ -85,9 +89,9 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
 
     Parameters
     ----------
-    x, y : array
+    x, y : ndarray
         x and y pixel coordinates.
-    lon, lat : array
+    lon, lat : ndarray
         Celestial longitude and latitude (world) coordinates.
     hdr : astropy.io.fits.Header
         A FITS header. Required keywords:
@@ -98,7 +102,7 @@ def fit_cdmatrix(x, y, lon, lat, hdr):
 
     Returns
     -------
-    array
+    ndarray
         The best-fit CD matrix, ``[[CD1_1, CD1_2], [CD2_1, CD2_2]]``.
 
     """
@@ -145,9 +149,9 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN',
 
     Parameters
     ----------
-    x, y : array
+    x, y : ndarray
         x and y pixel coordinates.
-    lon, lat : array
+    lon, lat : ndarray
         Celestial longitude and latitude (world) coordinates.
     ctype1, ctype2 : str, optional
         Values for the CTYPE1 and CTYPE2 header keywords; describes the

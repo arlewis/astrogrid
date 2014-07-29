@@ -8,11 +8,11 @@ Tools for creating 2d grids from flattened data.
 
 `astrogrid` provides the `Grid` class, which takes an unstructured set of
 data, performs a user-defined calculation on it, and arranges the results
-as a grid of the desired shape. The resulting grid is a 2d `numpy` array,
-so it can easily be processed further, plotted, or written to an image
-file. The main focus of the package is on calculating broadband fluxes from
-star formation history (SFH) data, but the input data and calculated grid
-values could be anything.
+as a grid of the desired shape. The resulting grid is a 2d ndarray, so it
+can easily be processed further, plotted, or written to an image file. The
+main focus of the package is on calculating broadband fluxes from star
+formation history (SFH) data, but the input data and calculated grid values
+could be anything.
 
 `astrogrid` requires the following core packages:
 
@@ -66,11 +66,11 @@ that the `flux` module is really just a convenience frontend for
 
 Now create a list of arguments and a list of keyword arguments to pass to
 `calc_flux` for each cell in the grid. The grid is represented by a 2d
-`numpy` array, and it is always filled starting from row 0, column 0, then
-going through the columns before moving to the next row, and so on. The
-order of the cell arguments should therefore correspond to a flattened 2d
-array (e.g., `numpy.ravel`). For this example, assume that the cells are
-labeld "a" through "l" arranged in the following way::
+ndarray, and it is always filled starting from row 0, column 0, then going
+through the columns before moving to the next row, and so on. The order of
+the cell arguments should therefore correspond to a flattened array (e.g.,
+`numpy.ravel`). For this example, assume that the cells are labeld "a"
+through "l" arranged in the following way::
 
      +---+---+---+---+
     2| i | j | k | l |

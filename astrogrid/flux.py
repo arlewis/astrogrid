@@ -21,15 +21,22 @@ Constants
 Functions
 ---------
 
-============ ==============================================================
-`calc_mag`   Calculate the magnitude of an SED in a given filter.
-`calc_sed`   Calculate the SED for a binned SFH.
-`get_zmet`   Return the closest FSPS `zmet` integer for the given log metal
-             abundance.
-`mag2flux`   Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
-`round_logz` Return the closest log metal abundance value corresponding to
-             a valid choice of the FSPS zmet parameter.
-============ ==============================================================
+================ ==========================================================
+`calc_mag`       Calculate the magnitude of an SED in a given filter.
+`calc_sed`       Calculate the SED for a binned SFH.
+`galex_cps2flux` GALEX counts per second to flux (erg s-1 cm-2 A-1).
+`galex_cps2mag`  GALEX counts per second to AB magnitude.
+`galex_flux2cps` GALEX flux (erg s-1 cm-2 A-1) to counts per second.
+`galex_flux2mag` GALEX flux (erg s-1 cm-2 A-1) to AB magnitude.
+`galex_mag2cps`  GALEX AB magnitude to counts per second.
+`galex_mag2flux` GALEX AB magnitude to flux (erg s-1 cm-2 A-1).
+`get_zmet`       Return the closest FSPS `zmet` integer for the given log
+                 metal abundance.
+`mag2flux`       Convert AB magnitude in a filter to flux (erg s-1 cm-2
+                 A-1).
+`round_logz`     Return the closest log metal abundance value corresponding
+                 to a valid choice of the FSPS zmet parameter.
+================ ==========================================================
 
 """
 import bursty_sfh  # scombine repository
@@ -220,11 +227,11 @@ def calc_sed(sfr, age, **kwargs):
 
     Parameters
     ----------
-    sfr : array-like
+    sfr : 1d array_like
         SFR values (Msun yr-1) for the bins in the SFH.
-    age : tuple or array-like
+    age : tuple or array_like
         Ages (i.e., lookback times, yr) of the bin edges in the SFH. In the
-        tuple form, the first element is an array of ages for the young
+        tuple form, the first element is a array of ages for the young
         edges of the bins, and the second element gives the ages for the
         old edges. Both arrays have the same length as `sfr`.
         Alternatively, a single array of length ``len(sfr)+1`` may be
@@ -343,9 +350,9 @@ def calc_mag(wave, spec, band, dmod=None):
 
     Parameters
     ----------
-    wave : array
-        1d array of wavelengths (in Angstroms) where the SED is defined.
-    spec : array
+    wave : 1d ndarray
+        Wavelengths (in Angstroms) where the SED is defined.
+    spec : 1d or 2d ndarray
         Spectral flux values (Lsun A-1) at each wavelength in `wave`. The
         array may be a single spectrum of shape (len(wave),), or contain N
         individual spectra such that the shape is (N, len(wave)).
@@ -360,7 +367,7 @@ def calc_mag(wave, spec, band, dmod=None):
 
     Returns
     -------
-    float or array
+    float or ndarray
         AB magnitudes in the given filters. [1]_ If `spec` is a single
         spectrum and `band` is one name, then a float is returned. A 1d
         array is returned if either `spec` or `band` contain multiple
@@ -407,37 +414,62 @@ def calc_mag(wave, spec, band, dmod=None):
     return mags
 
 
-def _galex_cps2flux(cps, band):
-    """Counts per second to flux (erg s-1 cm-2 A-1)."""
+def _generic_galex_x2y_docstring(func):
+    template = """{summary}
+
+    Parameters
+    ----------
+    {var} : float or array_like
+    band : {{'FUV', 'NUV'}}
+
+    Returns
+    -------
+    float or array
+
+    """
+    summary = func.__doc__
+    var = func.func_code.co_varnames[0]
+    func.__doc__ = template.format(summary=summary, var=var)
+    return func
+
+
+@_generic_galex_x2y_docstring
+def galex_cps2flux(cps, band):
+    """GALEX counts per second to flux (erg s-1 cm-2 A-1)."""
     scale = {'galex_fuv': 1.40e-15, 'galex_nuv': 2.06e-16}
     return scale[band] * cps
 
 
-def _galex_flux2cps(flux, band):
-    """Flux (erg s-1 cm-2 A-1) to counts per second."""
+@_generic_galex_x2y_docstring
+def galex_flux2cps(flux, band):
+    """GALEX flux (erg s-1 cm-2 A-1) to counts per second."""
     scale = {'galex_fuv': 1.40e-15, 'galex_nuv': 2.06e-16}
     return  flux / scale[band]
 
 
-def _galex_cps2mag(cps, band):
-    """Counts per second to AB magnitude."""
+@_generic_galex_x2y_docstring
+def galex_cps2mag(cps, band):
+    """GALEX counts per second to AB magnitude."""
     zeropoint = {'galex_fuv': 18.82, 'galex_nuv': 20.08}
     return -2.5 * np.log10(cps) + zeropoint[band]
 
 
-def _galex_mag2cps(mag, band):
-    """AB magnitude to counts per second."""
+@_generic_galex_x2y_docstring
+def galex_mag2cps(mag, band):
+    """GALEX AB magnitude to counts per second."""
     zeropoint = {'galex_fuv': 18.82, 'galex_nuv': 20.08}
     return 10**(0.4 * (zeropoint[band] - mag))
 
 
-def _galex_flux2mag(flux, band):
-    """Flux (erg s-1 cm-2 A-1) to AB magnitude."""
+@_generic_galex_x2y_docstring
+def galex_flux2mag(flux, band):
+    """GALEX flux (erg s-1 cm-2 A-1) to AB magnitude."""
     return _galex_cps2mag(_galex_flux2cps(flux, band), band)
 
 
-def _galex_mag2flux(mag, band):
-    """AB magnitude to flux (erg s-1 cm-2 A-1)."""
+@_generic_galex_x2y_docstring
+def galex_mag2flux(mag, band):
+    """GALEX AB magnitude to flux (erg s-1 cm-2 A-1)."""
     return _galex_cps2flux(_galex_mag2cps(mag, band), band)
 
 
@@ -446,7 +478,7 @@ def mag2flux(mag, band):
 
     Parameters
     ----------
-    mag : float or array
+    mag : float or ndarray
         Input AB magnitude(s) in the given filter.
     band : str
         Name of the filter corresponding to `mag`. See `fsps.find_filter`
@@ -454,7 +486,7 @@ def mag2flux(mag, band):
 
     Returns
     -------
-    float or array
+    float or ndarray
         Flux in erg s-1 cm-2 A-1.
 
     """
