@@ -69,7 +69,7 @@ def calc_pixscale(hdr, ref='crpix', units=None):
     lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
     if astropy.version.minor < 4:
         # Makes no difference whether ICRS, Galactic, AltAz, etc.
-        points = astropy.coordinates.ICRSlon, lat, unit=units)
+        points = astropy.coordinates.ICRS(lon, lat, unit=units)
     else:
         # Makes no difference whether ICRS, Galactic, AltAz, etc.
         points = astropy.coordinates.SkyCoord(lon, lat, 'icrs', unit=units)
