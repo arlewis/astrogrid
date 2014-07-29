@@ -21,7 +21,7 @@ Functions
 """
 import astropy.io.fits
 import montage_wrapper as montage
-import numpy
+import numpy as np
 import os
 import shutil
 
