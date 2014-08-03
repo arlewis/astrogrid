@@ -24,7 +24,6 @@ Supporting modules are imported if the required packages are installed:
 
   - `FSPS <http://people.ucsc.edu/~conroy/FSPS.html>`_ and
     `python-fsps <https://github.com/dfm/python-fsps>`_
-    (or `this <https://github.com/bd-j/python-fsps>`_ fork)
   - `scombine <https://github.com/bd-j/scombine>`_
   - `sedpy <https://github.com/bd-j/sedpy>`_
 
@@ -184,6 +183,9 @@ Module Index
 .. |Grid| replace:: `~astrogrid.grid.Grid`
 
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 from .grid import Grid
 
 try:

@@ -39,6 +39,9 @@ Functions
 ================ ==========================================================
 
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import bursty_sfh  # scombine repository
 import fsps
 import numpy as np
@@ -211,11 +214,11 @@ def calc_sed(sfr, age, **kwargs):
     """Calculate the SED for a binned SFH.
 
     The form of the input SFH is a set of age bins with a SFR value
-    assigned to each bin. At each point in time in the SFH, an SED is
-    generated using an `fsps.StellarPopulation` instance. It can take
-    several seconds to create the instance initially, but it is saved in
-    `CURRENT_SP` and is reused to save time for subsequent calls to
-    `calc_sed`. If needed, the current `fsps.StellarPopulation` instance
+    assigned to each bin. At each point in time in the (upsampled) SFH, the
+    SED of an SSP is generated using an `fsps.StellarPopulation` instance.
+    It can take several seconds to create the instance initially, but it is
+    saved in `CURRENT_SP` and is reused to save time for subsequent calls
+    to `calc_sed`. If needed, the current `fsps.StellarPopulation` instance
     can be cleared with ``CURRENT_SP.pop(0)``.
 
     Under the hood, all stellar population synthesis is done using FSPS
@@ -261,15 +264,22 @@ def calc_sed(sfr, age, **kwargs):
         `sedpy`). [1]_
     fsps_kwargs : dict, optional
         Dictionary of keyword arguments for `fsps.StellarPopulation`.
-        Default is an empty dictionary. 'sfh'=0 will always be used.
+        Default is an empty dictionary. 'sfh' is always set to 0.
 
     Returns
     -------
-    tuple
-        A tuple containing an array of wavelengths (in Angstroms) and an
-        array of spectral flux values (Lsun A-1) at each wavelength. If
-        `age_observe` is a list, then the spectrum array has shape
-        (len(age_observe), len(wave)), otherwise it has shape (len(wave),).
+    ndarray
+        Wavelengths in Angstroms.
+    ndarray
+        Spectral flux values (Lsun A-1) at each wavelength. Shape is
+        (len(age_observe), len(wave)) if `age_observe` is a sequence, and
+        (len(wave),) otherwise.
+    float or ndarray
+        Total IR luminosity (Lsun), measured as the integrated difference
+        between the intrinsic spectrum and the reddened spectrum. None if
+        `av` and `dav` are None (no extinction). An array of shape
+        (len(age_observe),) is returned if `age_observe` is a sequence,
+        otherwise a float is returned.
 
     Notes
     -----
@@ -326,7 +336,10 @@ def calc_sed(sfr, age, **kwargs):
     # - Only interested in upsampling, not any burst stuff, so `f_burst`
     #   must be 0. Other parameters don't matter.
     #
-    dtypes = [('t1', 'float'), ('t2', 'float'), ('sfr', 'float')]
+    names = ['t1', 't2', 'sfr']
+    names = [name.encode('utf-8') for name in names]  # unicode names not allowed
+    types = [float, float, float]
+    dtypes = zip(names, types)
     sfh = np.array(zip(age[:-1], age[1:], sfr), dtypes)
     age, sfr = bursty_sfh.burst_sfh(f_burst=0, sfh=sfh, bin_res=bin_res)[:2]
 
@@ -335,17 +348,17 @@ def calc_sed(sfr, age, **kwargs):
                                    nsplit=nsplit, dust_curve=dust_curve)
     if av is None or dav is None:
         wave, spec, weights = output
-        lum_ir = None
+        lum_ir = np.repeat(None, len(spec))
     else:
         wave, spec, weights, lum_ir = output
 
     if not len_age_list:
-        spec = spec[0]
+        spec, weights, lum_ir = spec[0], weights[0], lum_ir[0]
 
-    return wave, spec
+    return wave, spec, lum_ir
 
 
-def calc_mag(wave, spec, band, dmod=None):
+def calc_mag(wave, spec, band, dmod=0):
     """Calculate the magnitude of an SED in a given filter.
 
     Parameters
@@ -361,9 +374,8 @@ def calc_mag(wave, spec, band, dmod=None):
         magnitude. See `fsps.find_filter` or `fsps.fsps.FILTERS` for valid
         filter names.
     dmod : float, optional
-        Distance modulus used to calculate apparent magnitudes which are
-        returned instead of absolute magnitudes. Default is None
-        (magnitudes are absolute).
+        Distance modulus for the apparent magnitude calculation. Default is
+        0 (equivalent to absolute magnitudes).
 
     Returns
     -------
@@ -389,19 +401,16 @@ def calc_mag(wave, spec, band, dmod=None):
         len_spec_list = len(spec_list)
 
     if isinstance(band, basestring):
-        band_list = [band]
+        band_list = [band.encode('utf-8')]  # unicode name not allowed
         len_band_list = 0
     else:
-        band_list = band
+        band_list = [b.encode('utf-8') for b in band]  # unicode names not allowed
         len_band_list = len(band_list)
 
     band_list = sedpy.observate.load_filters(band_list)
     spec_list = spec_list * bursty_sfh.to_cgs  # erg s-1 cm-2 A-1
-    # Absolute
     mags = sedpy.observate.getSED(wave, spec_list, filterlist=band_list)
-
-    if dmod is not None:
-        mags += dmod  # Apparent
+    mags += dmod
 
     if not len_spec_list and not len_band_list:
         mags = float(mags)
@@ -464,13 +473,13 @@ def galex_mag2cps(mag, band):
 @_generic_galex_x2y_docstring
 def galex_flux2mag(flux, band):
     """GALEX flux (erg s-1 cm-2 A-1) to AB magnitude."""
-    return _galex_cps2mag(_galex_flux2cps(flux, band), band)
+    return galex_cps2mag(galex_flux2cps(flux, band), band)
 
 
 @_generic_galex_x2y_docstring
 def galex_mag2flux(mag, band):
     """GALEX AB magnitude to flux (erg s-1 cm-2 A-1)."""
-    return _galex_cps2flux(_galex_mag2cps(mag, band), band)
+    return galex_cps2flux(galex_mag2cps(mag, band), band)
 
 
 def mag2flux(mag, band):
@@ -491,7 +500,7 @@ def mag2flux(mag, band):
 
     """
     if band in ['galex_fuv', 'galex_nuv']:
-        flux = _galex_mag2flux(mag, band)
+        flux = galex_mag2flux(mag, band)
     else:
         # Raise error?
         flux = None

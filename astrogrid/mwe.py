@@ -19,6 +19,9 @@ Functions
 ======== ==============
 
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import astropy.io.fits
 import montage_wrapper as montage
 import numpy as np
@@ -28,101 +31,105 @@ import shutil
 from . import wcs
 
 
-def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
-           density=False, full=False, header=None, preprocess=None,
-           postprocess=None, **kwargs):
+def mosaic(input_files, mosaic_file, work_dir, background_match=False,
+           cdelt=None, density=False, equinox=None, header=None,
+           level_only=False, north_aligned=False, postprocess=None,
+           preprocess=None, system=None, weights_file=None):
     """Make a mosiac.
 
-    This is essentially a wrapper around `montage_wrapper.mosaic`. Files
-    are handled slightly differently, however, and there is added support
-    for processing the data before and after mosaicking. There are also
-    options for using images in total flux units (Montage always assumes
-    flux density units), and for creating an intermediate full mosaic
-    before making the final mosaic for the given header.
-
-    All `montage_wrapper.mosaic` keyword arguments are valid and have their
-    usual defaults, except for,
-
-    - `work_dir`: Reserved as an argument name. Internally, the
-      `montage_wrapper.mosaic` keyword argument of the same name is set to
-      ``work_dir/montage``.
-    - `output_dir`: Set to ``work_dir/output``.
-    - `imglist`: Set to None. Individual files are specified with the
-      `input_files` argument.
-    - `cleanup`: This is actually for the entire `work_dir`, not just the
-      part used by `montage_wrapper.mosaic`, and the default is False.
+    High-level wrapper around several Montage operations similar to
+    `montage_wrapper.mosaic`. The main differences are 1) added support for
+    preprocessing the input images before reprojection and postprocessing
+    the final image after mosaicking, 2) options for using images in total
+    flux units instead of flux density (as assumed by Montage), 3) more of
+    the `montage_wrapper.mMakeHdr` keywords available for header creation,
+    and 4) the `whole` keyword for `montage_wrapper.mProjExec` is
+    automatically set to True when `background_match` is True. The latter
+    is important since backround matching behaves unreliably otherwise.
 
     Parameters
     ----------
     input_files : list or string
         List of paths to the input images. This may also be the path to a
-        directory containing all input images, mimicking the
-        `montage_wrapper.mosaic` interface. In this case, `input_files`
+        directory containing all input images, in which case `input_files`
         will automatically be set to a list of all files in the directory
         ending with ".fits".
     mosaic_file : str
-        Path to the output mosaic file. It is either a symlink to
-        ``work_dir/output/mosaic.fits`` or a new file depending on the
-        `postprocess`, `density`, and `cleanup` keywords. The final mosaic
-        always has the same units as the `input_files` images.
+        Path to the output mosaic file. The final mosaic always has the
+        same units as the `input_files` images.
     work_dir : str
         Path to the working directory for all intermediate files produced
-        by Montage, and has the following structure::
+        by Montage. The directory has the following structure::
 
           work_dir/
             input/
-              (Contains either symlinks to `input_files` or new files
+              Contains either symlinks to `input_files` or new files
               depending on the `preprocess` and `density` keywords.
               Assuming the `density` keyword has been set correctly, these
-              images will always be in flux density units.)
-            montage/
-              (The working directory for `montage_wrapper.mosaic`. Contains
-              all intermediate files produced by Montage, including the
-              reprojected images and area files.)
+              images will always be in flux density units.
+            reprojected/
+              The reprojected images.
+            differences/
+              Difference calculations for background matching (only if
+              `background_match` is True).
+            corrected/
+              Background-matched images (only if `background_match` is
+              True).
             output/
-              mosaic.fits
-              mosaic_area.fits
-              (The final mosaic and its accompanying area file. May also
-              contain a full mosaic and area file depending on the `full`
-              and `header` keywords. Mosaics are always in flux density
-              units, and the area files are always in steradians.)
+              The intermediate mosiac used to produce the final mosaic
+              file, depending on the `density` and `postprocess` keywords.
 
-    cleanup : bool, optional
-        If True, `work_dir` is be deleted after the mosaic is created.
-        Default is False.
+    background_match : bool, optional
+        If True, match the background levels of the reprojected images
+        before mosaicking. Automatically sets ``whole = True`` in
+        `montage_wrapper.mProjExec`. Default is False.
+    cdelt : float, optional
+        See `header` and `montage_wrapper.mMakeHdr`. Default is None.
     density : bool, optional
         If True, the input images are in flux density units (i.e., signal
         per unit pixel area). If False (default), the input images are
         assumed to be in units of total flux, and are automatically scaled
         to flux density before reprojection.
-    full : bool, optional
-        If True, an intermediate mosaic that fully covers the input images
-        is created first, and then the full mosaic is reprojected to
-        `header`. The full mosaic is created using an automatically
-        generated header (as if setting `header` to None). This option is
-        useful in cases where `background_match` is True and `header`
-        covers only a portion of the input images, as background matching
-        works best when operating on the full extent of the input images.
-        Default is False. This keyword is ignored if `header` is
-        None.
+    equinox : str, optional
+        See `header` and `montage_wrapper.mMakeHdr`. Default is None.
     header : str, optional
-        Path to the header file describing the output mosaic. Default is
-        None, in which case an automatically generated header that
-        optimally covers the input images is used.
-    preprocess, postprocess : function, optional
+        Path to the template header file describing the output mosaic.
+        Default is None, in which case a template header is created
+        automatically using `montage_wrapper.mMakeHdr` and the `cdelt`,
+        `equinox`, `north_aligned`, and `system` keyword arguments.
+    level_only : bool, optional
+        See `montage_wrapper.mBgModel`. Ignored if `background_match` is
+        False. Default is False.
+    north_aligned : bool, optional
+        See `header` and `montage_wrapper.mMakeHdr`. Default is None.
+    postprocess, preprocess : function, optional
         Functions for processing the raw input images before the input
-        density images are created and after the final mosaic is created.
-        The function arguments should be the image data array and the image
-        header (`astropy.io.fits.Header`), and the return values should be
-        the same. Default is None.
+        density images are created (`preprocess`) and after the final
+        mosaic is created (`postprocess`). The function arguments should be
+        the image data array and the image header
+        (`astropy.io.fits.Header`), and the return values should be the
+        same. Default is None.
+    system : str, optional
+        See `header` and `montage_wrapper.mMakeHdr`. Default is None.
+    weights_file : str, optional
+        Path to output pixel weights file. Pixel weights are derived from
+        the final mosaic area file. Weights are normalized to 1, and
+        represent coverage of the mosaic area by the input images. Unlike
+        Montage area files, regions where the input images overlap are not
+        considered. Default is None.
+
+    Returns
+    -------
+    None
 
     """
-    # Get list of files if `input_files` is a directory name
+    # Get list of files if input_files is a directory name
     if isinstance(input_files, basestring):
         dirname = os.path.dirname(input_files)
         input_files = [os.path.join(dirname, basename)
                        for basename in os.listdir(dirname)
                        if os.path.splitext(basename)[1] == '.fits']
+
 
     # Create working directory
     try:
@@ -132,26 +139,31 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
         os.makedirs(work_dir)
 
 
-    # Create input directory and populate it
+    # Create input directory, populate it, and get image metadata
     input_dir = os.path.join(work_dir, 'input')
     os.mkdir(input_dir)
+
     if preprocess or not density:
         # Create new input files
         for input_file in input_files:
             data, hdr = astropy.io.fits.getdata(input_file, header=True)
+
             if preprocess:
                 data, hdr = preprocess(data, hdr)
+
             if not density:
-                # Use pixel area to convert total flux into flux density
+                # Convert total flux into flux density
                 dx, dy = wcs.calc_pixscale(hdr, ref='crpix').arcsec
-                area = dx * dy  # arcsec2
-                data /= area
+                pixarea = dx * dy  # arcsec2
+                data /= pixarea
+
             # Write
-            basename, ext = os.path.splitext(os.path.basename(input_file))
-            basename = '{0:s}_density{1:s}'.format(basename, ext)
+            basename = os.path.basename(input_file)
+            basename = '_density'.join(os.path.splitext(basename))
             new_input_file = os.path.join(input_dir, basename)
             hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
             hdu.writeto(new_input_file)
+
     else:
         # Symlink existing files
         for input_file in input_files:
@@ -159,43 +171,112 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
             new_input_file = os.path.join(input_dir, basename)
             os.symlink(input_file, new_input_file)
 
-    # Mosaic
+    input_table = os.path.join(input_dir, 'input.tbl')
+    montage.mImgtbl(input_dir, input_table, corners=True)
+
+
+    # Template header
+    if header is None:
+        template_header = os.path.join(work_dir, 'template.hdr')
+        montage.mMakeHdr(input_table, template_header, cdelt=cdelt,
+                         equinox=equinox, north_aligned=north_aligned,
+                         system=system)
+    else:
+        template_header = header
+
+
+    # Create reprojection directory, reproject, and get image metadata
+    proj_dir = os.path.join(work_dir, 'reprojected')
+    os.makedirs(proj_dir)
+
+    whole = True if background_match else False
+    stats_table = os.path.join(proj_dir, 'mProjExec_stats.log')
+    montage.mProjExec(input_table, template_header, proj_dir, stats_table,
+                      raw_dir=input_dir, whole=whole)
+
+    reprojected_table = os.path.join(proj_dir, 'reprojected.tbl')
+    montage.mImgtbl(proj_dir, reprojected_table, corners=True)
+
+
+    # Background matching
+    if background_match:
+        diff_dir = os.path.join(work_dir, 'differences')
+        os.makedirs(diff_dir)
+
+        # Find overlaps
+        diffs_table = os.path.join(diff_dir, 'differences.tbl')
+        montage.mOverlaps(reprojected_table, diffs_table)
+
+        # Calculate differences between overlapping images
+        montage.mDiffExec(diffs_table, template_header, diff_dir,
+                          proj_dir=proj_dir)
+
+        # Find best-fit plane coefficients
+        fits_table = os.path.join(diff_dir, 'fits.tbl')
+        montage.mFitExec(diffs_table, fits_table, diff_dir)
+
+        # Calculate corrections
+        corr_dir = os.path.join(work_dir, 'corrected')
+        os.makedirs(corr_dir)
+        corrections_table = os.path.join(corr_dir, 'corrections.tbl')
+        montage.mBgModel(reprojected_table, fits_table, corrections_table,
+                         level_only=level_only)
+
+        # Apply corrections
+        montage.mBgExec(reprojected_table, corrections_table, corr_dir,
+                        proj_dir=proj_dir)
+
+        img_dir = corr_dir
+
+    else:
+        img_dir = proj_dir
+
+
+    # Make mosaic
     output_dir = os.path.join(work_dir, 'output')
-    kwargs['header'] = None if header and full else header
-    kwargs['work_dir'] = os.path.join(work_dir, 'montage')
-    kwargs['imglist'] = None
-    kwargs['cleanup'] = False
-    montage.mosaic(input_dir, output_dir, **kwargs)
-    mtgmosaic_file = os.path.join(output_dir, 'mosaic.fits')
-    mtgarea_file = os.path.join(output_dir, 'mosaic_area.fits')
+    os.makedirs(output_dir)
 
-    # Reproject full mosaic to given header
-    if full:
-        basename, ext = os.path.splitext(os.path.basename(mtgmosaic_file))
-        fullmosaic_file = os.path.join(
-            output_dir, '{0:s}_full{1:s}'.format(basename, ext))
-        os.rename(mtgmosaic_file, fullmosaic_file)
-        fullarea_file = os.path.join(
-            output_dir, '{0:s}_full_area{1:s}'.format(basename, ext))
-        os.rename(mtgarea_file, fullarea_file)
-        montage.mProject(fullmosaic_file, mtgmosaic_file, header)
+    out_image = os.path.join(output_dir, 'mosaic.fits')
+    montage.mAdd(reprojected_table, template_header, out_image,
+                 img_dir=img_dir, exact=True)
 
-    # Write final mosaic, converting back into total flux if needed
+
+    # Pixel areas and weights
+    if weights_file or not density:
+        area_file = '_area'.join(os.path.splitext(out_image))
+        area, hdr = astropy.io.fits.getdata(area_file, header=True)  # steradians
+        area *= (180/np.pi*3600)**2  # arcsec2
+        dx, dy = wcs.calc_pixscale(hdr, ref='crpix').arcsec
+        pixarea = dx * dy  # arcsec2
+        area = np.clip(area, 0, pixarea)  # Don't care about overlaps
+        if weights_file:
+            weights = area / pixarea  # Normalize to 1
+            hdu = astropy.io.fits.PrimaryHDU(weights, header=hdr)
+            try:
+                hdu.writeto(weights_file)
+            except IOError:
+                os.remove(weights_file)
+                hdu.writeto(weights_file)
+
+
+    # Write final mosaic
     dirname = os.path.dirname(mosaic_file)
     try:
         os.makedirs(dirname)
     except OSError:
         pass
+
     if postprocess or not density:
         # Create new file
-        data, hdr = astropy.io.fits.getdata(mtgmosaic_file, header=True)
+        data, hdr = astropy.io.fits.getdata(out_image, header=True)
+
         if not density:
             # Convert flux density into total flux
-            area = astropy.io.fits.getdata(mtgarea_file)  # steradians
-            area *= (180/np.pi*3600)**2  # arcsec2
             data *= area
+
         if postprocess:
             data, hdr = postprocess(data, hdr)
+
         # Write
         hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
         try:
@@ -203,20 +284,10 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
         except IOError:
             os.remove(mosaic_file)
             hdu.writeto(mosaic_file)
-    elif cleanup:
+
+    else:
         # Move existing file
-        os.rename(mtgmosaic_file, mosaic_file)
-    else:
-        # Symlink existing file
-        try:
-            os.symlink(mtgmosaic_file, mosaic_file)
-        except OSError:
-            os.remove(mosaic_file)
-            os.symlink(mtgmosaic_file, mosaic_file)
-
-    # Cleanup
-    if cleanup:
-        shutil.rmtree(work_dir)
+        os.rename(out_image, mosaic_file)
 
     return
 
@@ -255,209 +326,6 @@ def mosaic(input_files, mosaic_file, work_dir, cleanup=False,
       ~0.01% to ~0.001%. Might as well just use the simplest method (3).
 
 """
-
-def _make_mosaic(kind, make_header=False, cdelt=None, background_match=False,
-                level_only=True, preprocess=None, postprocess=None):
-    """Make a mosiac.
-
-    Montage is used to create the actual mosaic. The rest of this function
-    is for processing the data before and after mosaicing, and moving the
-    Montage output files to their desired locations.
-
-    There are eight types of files involved in the construction of a
-    mosaic, and their kinds are implied by the value of `kind` (the kinds,
-    given in parentheses, are used with `m31flux.config.path` to define
-    their paths):
-
-    - Input images ('kind')
-    - Density images ('kind.density')
-    - Template header ('kind.hdr')
-    - Reprojected images and their area files ('kind.reproject',
-      'kind.area')
-    - Density mosaic and its area file ('kind.reproject.add',
-      'kind.area.add')
-    - Final mosaic ('kind.add')
-
-    The input images are used to create a set of "density" images (signal
-    per unit pixel area). The density images are optionally preprocessed,
-    and are then reprojected to the template header and added via Montage.
-    The final mosaic is the product of the density mosaic and the
-    corresponding area file ('kind.area.add'), which is optionally
-    postprocessed before being written to file.
-
-    Parameters
-    ----------
-    kind : str
-        File kind for the input images (see `m31flux.config.path`).
-    make_header : bool, optional
-        If True, a template header for the mosaic will be created based on
-        the input images. If False (default), then the file pointed to by
-        `config.path` is used instead (kind.hdr).
-    cdelt : float, optional
-        Set the pixel scale (deg/pix) for the template header. If None
-        (default), the scale is determined automatically. This keyword is
-        ignored if `make_header` is False.
-    background_match, level_only : bool, optional
-        Background matching parameters. See `montage_wrapper.mosaic` for
-        details.
-    preprocess, postprocess : function, optional
-        Functions for processing the raw input images before the input
-        density images are created and after the final mosaic is created.
-        The function arguments should be the image data array and the image
-        header (`astropy.io.fits.Header`), and the return values should be
-        the same. Default is None.
-
-    Notes
-    -----
-    - Input and reprojected maps were compared for 21 PHAT bricks. For a
-      given brick, the percent difference between the pixel sum of the
-      native map and the pixel sum of the reprojected map was less than
-      ~0.01%. The average percent difference was ~0.001%.
-
-    - mProjExec and mProject produce nearly identical results (within
-      ~0.01%).
-
-    - Settings that affect reprojection: mProject has the 'z' flag, which
-      controls the drizzle factor. 1 seems to be the default, and appears
-      to give the best results anyway so there is no reason to change it.
-      mProjExec doesn't really have any settings that change the
-      reprojection results.
-
-    - Pixel area varies slightly accross brick 15 in both the native and
-      the reprojected images. The effect causes only ~0.001% difference
-      between the minimum and maximum areas, however, so the pixels can be
-      safely treated as having constant area.
-
-    - Three pixel area calculation methods were tested: 1) calculate the
-      areas of all pixels from the coordinates of their corners assuming
-      spherical rectangles, 2) calculate the areas of all pixels from their
-      x and y scales assuming planar rectangles, and 3) same as 2, but only
-      calculate the area for the reference pixel and assume that value for
-      all of the pixels. All three area calculation methods agree to within
-      ~0.01% to ~0.001%. Might as well just use the simplest method (3).
-
-    """
-    input_files = config.path(kind)
-    density_files = config.path('{:s}.density'.format(kind))
-    header_file = config.path('{:s}.hdr'.format(kind))
-    proj_files = config.path('{:s}.reproject'.format(kind))
-    area_files = config.path('{:s}.area'.format(kind))
-    projadd_file = config.path('{:s}.reproject.add'.format(kind))
-    areaadd_file = config.path('{:s}.area.add'.format(kind))
-    add_file = config.path('{:s}.add'.format(kind))
-
-    # Make density images
-    for input_file, density_file in zip(input_files, density_files):
-        # Load input image, perform initial processing
-        data, hdr = astropy.io.fits.getdata(input_file, header=True)
-        if preprocess is not None:
-            data, hdr = preprocess(data, hdr)
-
-        # Divide by pixel area to create a density image
-        dx, dy = astrogrid.wcs.calc_pixscale(hdr, ref='crpix').arcsec
-        area = dx * dy  # arcsec2
-        data = data / area
-
-        # Write
-        hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
-        dirname = os.path.dirname(density_file)
-        safe_mkdir(dirname)
-        if os.path.exists(density_file):
-            os.remove(density_file)
-        hdu.writeto(density_file)
-
-    # Temporary directory to hold all Montage inputs and outputs
-    dirname, basename = os.path.split(add_file)
-    basename = '_temp_{:s}'.format(os.path.splitext(basename)[0])
-    temp_dir = os.path.join(dirname, basename)
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-    os.makedirs(temp_dir)
-
-    # Create input dir and symlink density files
-    input_dir = os.path.join(temp_dir, 'input')
-    os.mkdir(input_dir)
-    for density_file in density_files:
-        filename = os.path.basename(density_file)
-        os.symlink(density_file, os.path.join(input_dir, filename))
-
-    # Specify output directory and Montage working directory
-    output_dir = os.path.join(temp_dir, 'output')
-    work_dir = os.path.join(temp_dir, 'work')
-
-    # Template header file
-    if make_header:
-        header_file = None
-    else:
-        header_file = config.path('{:s}.hdr'.format(kind))
-
-    # Make the mosaic; paths to the Montage output files
-    montage.mosaic(input_dir, output_dir, header=header_file,
-                   background_match=background_match, level_only=level_only,
-                   exact_size=True, cleanup=False, work_dir=work_dir)
-    mheader_file = os.path.join(work_dir, 'header.hdr')
-    mproj_dir = os.path.join(work_dir, 'projected')
-    mproj_files, marea_files = [], []
-    for density_file in density_files:
-        basename, ext = os.path.splitext(os.path.basename(density_file))
-        ### Does Montage always prefix reprojected images with 'hdu0_'?
-        mproj_file = 'hdu0_{0:s}{1:s}'.format(basename, ext)
-        mproj_files.append(os.path.join(mproj_dir, mproj_file))
-        marea_file = 'hdu0_{0:s}_area{1:s}'.format(basename, ext)
-        marea_files.append(os.path.join(mproj_dir, marea_file))
-    mprojadd_file = os.path.join(output_dir, 'mosaic.fits')
-    mareaadd_file = os.path.join(output_dir, 'mosaic_area.fits')
-
-    # Move and rename files:
-    # Template header
-    if make_header:
-        header_file = config.path('{:s}.hdr'.format(kind))
-        os.rename(mheader_file, header_file)
-    # Reprojected images
-    for mproj_file, proj_file in zip(mproj_files, proj_files):
-        dirname = os.path.dirname(proj_file)
-        safe_mkdir(dirname)
-        if os.path.exists(proj_file):
-            os.remove(proj_file)
-        os.rename(mproj_file, proj_file)
-    # Area files for reprojected images
-    for marea_file, area_file in zip(marea_files, area_files):
-        dirname = os.path.dirname(area_file)
-        safe_mkdir(dirname)
-        if os.path.exists(area_file):
-            os.remove(area_file)
-        os.rename(marea_file, area_file)
-    # Density mosaic
-    dirname = os.path.dirname(projadd_file)
-    safe_mkdir(dirname)
-    if os.path.exists(projadd_file):
-        os.remove(projadd_file)
-    os.rename(mprojadd_file, projadd_file)
-    # Area file for density mosaic
-    dirname = os.path.dirname(areaadd_file)
-    safe_mkdir(dirname)
-    if os.path.exists(areaadd_file):
-        os.remove(areaadd_file)
-    os.rename(mareaadd_file, areaadd_file)
-
-    # Clean up
-    #shutil.rmtree(temp_dir)
-
-    # Final mosaic
-    data, hdr = astropy.io.fits.getdata(projadd_file, header=True)
-    area = astropy.io.fits.getdata(areaadd_file) * (180/np.pi*3600)**2 # arcsec2
-    data = data * area
-    if postprocess is not None:
-        data, hdr = postprocess(data, hdr)
-    add_file = config.path('{:s}.add'.format(kind))
-    dirname = os.path.dirname(add_file)
-    safe_mkdir(dirname)
-    if os.path.exists(add_file):
-        os.remove(add_file)
-    hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
-    hdu.writeto(add_file)
-
-    return
 
 def _montage_test():
     # create density images

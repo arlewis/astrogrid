@@ -21,6 +21,9 @@ Functions
 =============== ===========================================================
 
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import astropy.coordinates
 import astropy.io.fits
 import astropy.units
@@ -59,7 +62,7 @@ def calc_pixscale(hdr, ref='crpix', units=None):
     if ref == 'crpix':
         x, y = hdr['crpix1'], hdr['crpix2']
     elif ref == 'center':
-        x, y = hdr['naxis1']/2, hdr['naxis2']/2
+        x, y = hdr['naxis1']//2, hdr['naxis2']//2
     else:
         x, y = ref
 
