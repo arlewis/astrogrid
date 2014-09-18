@@ -68,7 +68,7 @@ Now create a list of arguments and a list of keyword arguments to pass to
 ndarray, and it is always filled starting from row 0, column 0, then going
 through the columns before moving to the next row, and so on. The order of
 the cell arguments should therefore correspond to a flattened array (e.g.,
-`numpy.ravel`). For this example, assume that the cells are labeld "a"
+`numpy.ravel`). For this example, assume that the cells are labeled "a"
 through "l" arranged in the following way::
 
      +---+---+---+---+
@@ -91,7 +91,7 @@ alphabetical order:
 >>> band_list = ['galex_fuv'] * len(file_list)
 >>> distance_list = [distance] * len(file_list)
 >>> args = zip(file_list, band_list, distance_list)
->>> extinction_vals = [av_a, av_b, ... av_l]
+>>> av_list = [av_a, av_b, ... av_l]
 >>> kwargs = [{'extinction': av} for av in av_list]
 
 Next create a `Grid` instance and calculate the grid values:
