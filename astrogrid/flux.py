@@ -429,7 +429,7 @@ def _generic_galex_x2y_docstring(func):
     Parameters
     ----------
     {var} : float or array_like
-    band : {{'FUV', 'NUV'}}
+    band : {{'galex_fuv', 'galex_nuv'}}
 
     Returns
     -------
