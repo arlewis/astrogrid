@@ -10,15 +10,21 @@ Utilities for working with world coordinate systems.
 Functions
 ---------
 
-=============== ===========================================================
-`calc_pixscale` Calculate the x and y pixel scales from the WCS information
-                in a FITS header.
-`fit_cdmatrix`  Fit a CD matrix for a set of points with known pixel and
-                world coordinates.
-`make_header`   Create a FITS header from a set of points with known pixel
-                and world coordinates given a celestial coordinate system
-                and projection.
-=============== ===========================================================
+======================== ==================================================
+`calc_pixscale`          Calculate the x and y pixel scales from the WCS
+                         information in a FITS header.
+`fit_cdmatrix`           Fit a CD matrix for a set of points with known
+                         pixel and world coordinates.
+`make_header`            Create a FITS header from a set of points with
+                         known pixel and world coordinates given a
+                         celestial coordinate system and projection.
+`gcdist`                 Calculate the great circle distance between the
+                         given endpoints.
+`sparea`                 Calculate the area of a spherical polygon.
+`separation_deprojected` Calculate the deprojected linear separation
+                         between coordinates in a spiral galaxy assuming a
+                         distance, a position angle, and an inclination.
+======================== ==================================================
 
 """
 from __future__ import (absolute_import, division, print_function,
@@ -195,6 +201,167 @@ def make_header(x, y, lon, lat, ctype1='RA---TAN', ctype2='DEC--TAN',
     hdr['CD2_1'], hdr['CD2_2'] = cd[1, 0], cd[1, 1]
 
     return hdr
+
+
+def gcdist(lonlat1, lonlat2, unit='deg'):
+    """Calculate the great circle distance between the given endpoints.
+
+    Basically just a convenience function for making `SkyCoord` instances
+    and calling the `separation` method.
+
+    Parameters
+    ----------
+    lonlat1, lonlat2 : SkyCoord or (2,) tuple of array_like
+        Longitude and latitude of the great circle line endpoints.
+        (`SkyCoord` is `astropy.coordinates.sky_coordinate.SkyCoord`.)
+    unit : str or astropy.units.core.Unit, optional
+        Units of the input coordinates. Default is 'deg' (degrees).
+
+    Returns
+    -------
+    astropy.coordinates.angles.Angle
+
+    """
+    ### Here is the haversine formula for reference:
+    #l = 2 * np.arcsin(np.sqrt(np.sin((lat[1:] - lat[:-1]) / 2)**2 +
+    #                          np.cos(lat[:-1]) * np.cos(lat[1:]) *
+    #                          np.sin((lon[1:] - lon[:-1]) / 2)**2))
+
+    if not isinstance(lonlat1, astropy.coordinates.SkyCoord):
+        lonlat1 = astropy.coordinates.SkyCoord(*lonlat1, unit=unit)
+        lonlat2 = astropy.coordinates.SkyCoord(*lonlat2, unit=unit)
+    l = lonlat1.separation(lonlat2)
+    return l
+
+
+def sparea(lon, lat, R=1, unit='deg', axis=0):
+    """Calculate the area of a spherical polygon.
+
+    It is assumed that the polygon contains no poles! The method is adapted
+    from "Some algorithms for polygons on a sphere" by Chamberlain and
+    Duquette (http://trs-new.jpl.nasa.gov/dspace/handle/2014/40409)
+
+    Parameters
+    ----------
+    lon, lat : array_like
+        Longitude and latitude of each vertex in the polygon. The first
+        vertex may be listed either only at the beginning of the sequence,
+        or both at the beginning and at the end of the sequence.
+        Multidimensional arrays can be used to compuate areas for more than
+        one polygon at once (e.g., a 2d array where each row is a polygon
+        and vertices are in the columns; see the `axis` keyword). All
+        polygons must have the same number of vertices.
+    R : float, optional
+        Radius of the sphere. Default is 1.
+    unit : str or astropy.units.core.Unit, optional
+        Units for `lon` and `lat`. Default is 'deg' (degrees).
+    axis : int, optional
+        The axis along which the polygon vertices are listed. For example,
+        if `lon` and `lat` are 2d arrays where each row is a polygon and
+        vertices are in the columns, then `axis` should be set to 1.
+        Default is 0.
+
+    Returns
+    -------
+    astropy.units.quantity.Quantity
+        Total area of the spherical polygon in units of ``lonunits *
+        latunits * R**2``. Note: the `Quantity` instance only knows about
+        the solid angle units; the units of `R` are not attached!
+
+    """
+    # Ensure ndarray and one polygon per row
+    lon, lat = np.asarray(lon), np.asarray(lat)
+    if lon.ndim == 1:
+        lon, lat = lon[None,:], lat[None,:]
+    else:
+        lon = np.rollaxis(lon, axis).reshape(lon.shape[axis], -1).T
+        lat = np.rollaxis(lat, axis).reshape(lat.shape[axis], -1).T
+
+    # Ensure the polygon is closed (check first row for efficiency)
+    if not lon[0,-1] == lon[0,0]:
+        lon = np.append(lon, lon[:,0:1], axis=1)
+        lat = np.append(lat, lat[:,0:1], axis=1)
+
+    try:
+        # Assuming unit is a string
+        unit = getattr(astropy.units, unit)
+    except TypeError:
+        # unit is probably a member of astropy.units
+        pass
+    try:
+        # Assuming unit is list-like
+        lonunit, latunit = unit
+    except TypeError:
+        # unit is single unit instance
+        lonunit, latunit = unit, unit
+    lonlat = astropy.coordinates.SkyCoord(lon, lat, unit=(lonunit, latunit))
+    lon, lat = lonlat.ra.rad, lonlat.dec.rad
+
+    # Great circle segments between vertices
+    l = lonlat[:,:-1].separation(lonlat[:,1:]).rad
+
+    # Semiperimeter of each spherical triangle
+    s = 0.5 * (l + np.pi + lat[:,:-1] + lat[:,1:])
+
+    # Spherical excess of each spherical triangle from L'Huilier's theorem.
+    # Note that none of the terms should be negative (not 100% sure about
+    # that); assume that any negative values are within machine precision
+    # of 0.
+    term1 = (s - (np.pi / 2 + lat[:,:-1])) /2
+    term1[term1<0] = 0
+    term2 = (s - (np.pi / 2 + lat[:,1:])) /2
+    term2[term2<0] = 0
+    result = np.tan(s/2) * np.tan((s-l)/2) * np.tan(term1) * np.tan(term2)
+    E = 4 * np.arctan(np.sqrt(result))
+
+    # Let A<0 for lon[i]<lon[i+1], A>0 for lon[i+1]<lon[i] assuming ccw
+    # traversal (looking at the sky, where lon increases to the east)
+    sign = 2*(lon[:,1:] < lon[:,:-1]) - 1
+
+    # Total area
+    A = np.sum(sign * E, axis=1) * R**2
+    A = np.absolute(A)  # Fix the sign in case the vertices are not listed ccw
+    A = (A * astropy.units.rad**2).to(lonunit * latunit)  # Attach units
+    return A
+
+
+def separation_deprojected(coord1, coord2, dist, pa, inc):
+    """Calculate the deprojected linear separation between coordinates in a
+    spiral galaxy assuming a distance, a position angle, and an
+    inclination.
+
+    Parameters
+    ----------
+    coord1, coord2 : astropy.coordinates.sky_coordinates.SkyCoord
+        Endpoints for the separation calculation.
+    dist : float or astropy.units.Quantity
+        Distance to the galaxy.
+    pa : float
+        Position angle of the galaxy in degrees.
+    inc : float
+        Inclination angle of the galaxy's disk in degrees.
+
+    Returns
+    -------
+    float or astropy.units.Quantiy
+        Type is determined by `dist`.
+
+    Notes
+    -----
+    Probably should not use this to calculate areas (e.g., multiplying
+    deprojected side lengths for a rectangular region). Rather, just
+    calculate the spherical polygon area and deproject by dividing by the
+    cosine of the disk inclination.
+
+    """
+    angular_sep = coord1.separation(coord2)
+    pa_coords = coord1.position_angle(coord2)
+
+    projected_length = dist * angular_sep.rad
+    theta = np.radians(pa) - pa_coords.rad
+    deprojected_length = projected_length * np.sqrt(
+        np.cos(theta)**2 + np.sin(theta)**2 / np.cos(np.radians(inc))**2)
+    return deprojected_length
 
 
 
