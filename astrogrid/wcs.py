@@ -37,6 +37,7 @@ import astropy.wcs
 import numpy as np
 import scipy.optimize
 
+from pdb import set_trace
 
 def calc_pixscale(hdr, ref='crpix', units=None):
     """Calculate the x and y pixel scales from the WCS information in a
@@ -62,9 +63,13 @@ def calc_pixscale(hdr, ref='crpix', units=None):
     astropy.coordinates.Angle
         An `Angle` instance containing the x and y pixel scales.
 
-    """
-    wcs = astropy.wcs.WCS(hdr)
+    Updates
+    -------
+    added naxis keyword to astropy.wcs.WCS call to ensure only 2 axes are
+    used. - A. R. Lewis 03/30/2015
 
+    """
+    wcs = astropy.wcs.WCS(hdr, naxis=2)
     if ref == 'crpix':
         x, y = hdr['crpix1'], hdr['crpix2']
     elif ref == 'center':
@@ -76,12 +81,12 @@ def calc_pixscale(hdr, ref='crpix', units=None):
         units = wcs.wcs.cunit
 
     lon, lat = wcs.wcs_pix2world([x, x+1, x], [y, y, y+1], 1)
-    if astropy.version.minor < 4:
+    if (astropy.version.major < 1) & (astropy.version.minor < 4):
         # Makes no difference whether ICRS, Galactic, AltAz, etc.
         points = astropy.coordinates.ICRS(lon, lat, unit=units)
     else:
         # Makes no difference whether ICRS, Galactic, AltAz, etc.
-        points = astropy.coordinates.SkyCoord(lon, lat, 'icrs', unit=units)
+        points = astropy.coordinates.SkyCoord(lon, lat, frame='icrs', unit=units)
     dxy = astropy.coordinates.Angle([points[0].separation(points[1]),
                                      points[0].separation(points[2])])
     return dxy

@@ -30,8 +30,9 @@ import shutil
 
 from . import wcs
 
+from pdb import set_trace
 
-def mosaic(input_files, mosaic_file, work_dir, background_match=False,
+def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
            cdelt=None, density=False, equinox=None, header=None,
            level_only=False, north_aligned=False, postprocess=None,
            preprocess=None, system=None, weights_file=None):
@@ -130,7 +131,6 @@ def mosaic(input_files, mosaic_file, work_dir, background_match=False,
                        for basename in os.listdir(dirname)
                        if os.path.splitext(basename)[1] == '.fits']
 
-
     # Create working directory
     try:
         os.makedirs(work_dir)
@@ -142,12 +142,12 @@ def mosaic(input_files, mosaic_file, work_dir, background_match=False,
     # Create input directory, populate it, and get image metadata
     input_dir = os.path.join(work_dir, 'input')
     os.mkdir(input_dir)
-
-    if preprocess or not density:
+    
+    if preprocess or not density or ext>0:
         # Create new input files
         for input_file in input_files:
-            data, hdr = astropy.io.fits.getdata(input_file, header=True)
-
+            data, hdr = astropy.io.fits.getdata(input_file, header=True,
+                                                ext=ext)
             if preprocess:
                 data, hdr = preprocess(data, hdr)
 
@@ -173,8 +173,7 @@ def mosaic(input_files, mosaic_file, work_dir, background_match=False,
 
     input_table = os.path.join(input_dir, 'input.tbl')
     montage.mImgtbl(input_dir, input_table, corners=True)
-
-
+    
     # Template header
     if header is None:
         template_header = os.path.join(work_dir, 'template.hdr')
@@ -184,20 +183,18 @@ def mosaic(input_files, mosaic_file, work_dir, background_match=False,
     else:
         template_header = header
 
-
     # Create reprojection directory, reproject, and get image metadata
     proj_dir = os.path.join(work_dir, 'reprojected')
     os.makedirs(proj_dir)
-
     whole = True if background_match else False
     stats_table = os.path.join(proj_dir, 'mProjExec_stats.log')
+
     montage.mProjExec(input_table, template_header, proj_dir, stats_table,
                       raw_dir=input_dir, whole=whole)
 
     reprojected_table = os.path.join(proj_dir, 'reprojected.tbl')
     montage.mImgtbl(proj_dir, reprojected_table, corners=True)
-
-
+    
     # Background matching
     if background_match:
         diff_dir = os.path.join(work_dir, 'differences')

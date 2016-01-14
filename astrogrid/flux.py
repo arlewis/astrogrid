@@ -30,6 +30,7 @@ Functions
 `galex_flux2mag` GALEX flux (erg s-1 cm-2 A-1) to AB magnitude.
 `galex_mag2cps`  GALEX AB magnitude to counts per second.
 `galex_mag2flux` GALEX AB magnitude to flux (erg s-1 cm-2 A-1).
+`swift_cps2flux' SWIFT counts per second to flux (erg s-1 cm-2 A-1).
 `get_zmet`       Return the closest FSPS `zmet` integer for the given log
                  metal abundance.
 `mag2flux`       Convert AB magnitude in a filter to flux (erg s-1 cm-2
@@ -48,6 +49,7 @@ import numpy as np
 import sedpy.attenuation
 import sedpy.observate
 
+from pdb import set_trace
 
 CURRENT_SP = []
 """Container for `fsps.StellarPopulation` instances.
@@ -295,6 +297,7 @@ def calc_sed(sfr, age, **kwargs):
        summing the pieces back together.
 
     """
+
     if len(age) == 2:
         try:
             age = np.append(age[0], age[1][-1])  # One array of bin edges
@@ -341,19 +344,27 @@ def calc_sed(sfr, age, **kwargs):
     types = [float, float, float]
     dtypes = zip(names, types)
     sfh = np.array(zip(age[:-1], age[1:], sfr), dtypes)
+
     age, sfr = bursty_sfh.burst_sfh(f_burst=0, sfh=sfh, bin_res=bin_res)[:2]
 
     # Spectrum at each observation age
-    output = bursty_sfh.bursty_sps(age_list, age, sfr, sp, av=av, dav=dav,
-                                   nsplit=nsplit, dust_curve=dust_curve)
-    if av is None or dav is None:
-        wave, spec, weights = output
-        lum_ir = np.repeat(None, len(spec))
-    else:
-        wave, spec, weights, lum_ir = output
+    #output = bursty_sfh.bursty_sps(age_list, age, sfr, sp, av=av, dav=dav,
+    #                               nsplit=nsplit, dust_curve=dust_curve)
 
+    output = bursty_sfh.bursty_sps(age, sfr, sp, lookback_time=age_list, av=av, dav=dav,
+                                   npslit=nsplit, dust_curve=dust_curve)
+
+#    if av is None or dav is None:
+#        wave, spec, weights = output
+#        lum_ir = np.repeat(None, len(spec))
+#    else:
+#        wave, spec, weights, lum_ir = output
+
+    wave, spec, mstar, lum_ir = output
+    #set_trace()
     if not len_age_list:
-        spec, weights, lum_ir = spec[0], weights[0], lum_ir[0]
+    #    spec, weights, lum_ir = spec[0], weights[0], lum_ir[0]
+        spec, mstar, lum_ir = spec[0], mstar, lum_ir
 
     return wave, spec, lum_ir
 
@@ -404,7 +415,7 @@ def calc_mag(wave, spec, band, dmod=0):
         band_list = [band.encode('utf-8')]  # unicode name not allowed
         len_band_list = 0
     else:
-        band_list = [b.encode('utf-8') for b in band]  # unicode names not allowed
+        band_list = [b.encode('utf-8') for b in band] # unicode name not allowed
         len_band_list = len(band_list)
 
     band_list = sedpy.observate.load_filters(band_list)
@@ -482,8 +493,24 @@ def galex_mag2flux(mag, band):
     return galex_cps2flux(galex_mag2cps(mag, band), band)
 
 
+
+
+def irac_mag2flux(mag, band):
+    """IRAC magnitude to flux density (Jy) (erg s-1 cm-2 Hz-1)."""
+    flux = 10**((23.9 - mag) / 2.5) / 1e6
+    return flux
+
+
+def irac_flux2mag(flux, band):
+    """IRAC flux density (Jy) to magnitude."""
+    mag = 23.9 - 2.5 * np.log10(flux * 1e6)
+    return mag
+
+
+
 def mag2flux(mag, band):
-    """Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1).
+    """Convert AB magnitude in a filter to flux (erg s-1 cm-2 A-1)
+    or flux density (erg s-1 cm-2 Hz-1).
 
     Parameters
     ----------
@@ -496,16 +523,75 @@ def mag2flux(mag, band):
     Returns
     -------
     float or ndarray
-        Flux in erg s-1 cm-2 A-1.
+        Flux in erg s-1 cm-2 A-1 or flux density in erg s-1 cm-2 Hz-1.
 
     """
     if band in ['galex_fuv', 'galex_nuv']:
         flux = galex_mag2flux(mag, band)
+    elif band in ['uvot_w1', 'uvot_m2', 'uvot_w2']:
+        flux = swift_mag2flux(mag, band)
+    elif band in ['irac_1']:
+        flux = irac_mag2flux(mag, band)
     else:
         # Raise error?
         flux = None
 
     return flux
+
+def _generic_swift_x2y_docstring(func):
+    template = """{summary}
+
+    Parameters
+    ----------
+    {var} : float or array_like
+    band : {{'uvot_m2', 'uvot_w1', 'uvot_w2'}}
+
+    Returns
+    -------
+    float or array
+
+    """
+    summary = func.__doc__
+    var = func.func_code.co_varnames[0]
+    func.__doc__ = template.format(summary=summary, var=var)
+    return func
+
+
+@_generic_swift_x2y_docstring
+def swift_cps2flux(cps, band):
+    """SWIFT counts per second to flux (erg s-1 cm-2 A-1).
+    Conversion factors from: http://heasarc.gsfc.nasa.gov/docs/heasarc/caldb/swift/docs/uvot/uvot_caldb_AB_10wa.pdf."""
+    scale = {'uvot_m2': 8.489e-16, 'uvot_w1': 4.623e-16,
+             'uvot_w2': 6.225e-16}
+    return scale[band] * cps
+
+def swift_flux2cps(flux, band):
+    """SWIFT counts per second to flux (erg s-1 cm-2 A-1)."""
+    scale = {'uvot_m2': 8.489e-16, 'uvot_w1': 4.623e-16,
+             'uvot_w2': 6.225e-16}
+    return flux / scale[band]
+
+def swift_cps2mag(cps, band):
+    """ SWIFT counts per second to AB magnitude."""
+    zeropoint = {'uvot_m2': 18.54, 'uvot_w1': 18.95, 'uvot_w2': 19.11}
+    return -2.5 * np.log10(cps) + zeropoint[band]
+
+
+def swift_mag2cps(mag, band):
+    """ AB magnitude to SWIFT counts per second."""
+    zeropoint = {'uvot_m2': 18.54, 'uvot_w1': 18.95, 'uvot_w2': 19.11}
+    return 10**(0.4 * (zeropoint[band] - mag))
+
+
+def swift_flux2mag(flux, band):
+    """SWIFT flux (erg s-1 cm-2 A-1) to AB magnitude."""
+    return swift_cps2mag(swift_flux2cps(flux, band), band)
+
+
+def swift_mag2flux(mag, band):
+    """SWIFT AB magnitude to flux (erg s-1 cm-2 A-1)."""
+    return swift_cps2flux(swift_mag2cps(mag, band), band)
+
 
 
 
