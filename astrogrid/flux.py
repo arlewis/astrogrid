@@ -497,13 +497,18 @@ def galex_mag2flux(mag, band):
 
 def irac_mag2flux(mag, band):
     """IRAC magnitude to flux density (Jy) (erg s-1 cm-2 Hz-1)."""
-    flux = 10**((23.9 - mag) / 2.5) / 1e6
+    # zeropoints are in Jy
+    zeropoint = {'irac_1': 280.9, 'irac_2':179.7,
+                 'irac_3':115.0, 'irac_4':64.9}
+    flux = zeropoint[band] * 10**(-mag / 2.5)
     return flux
 
 
 def irac_flux2mag(flux, band):
     """IRAC flux density (Jy) to magnitude."""
-    mag = 23.9 - 2.5 * np.log10(flux * 1e6)
+    zeropoint = {'irac_1': 280.9, 'irac_2':179.7,
+                 'irac_3':115.0, 'irac_4':64.9}
+    mag = 2.5 * np.log10(zeropoint[band] / (flux * 1e6))
     return mag
 
 

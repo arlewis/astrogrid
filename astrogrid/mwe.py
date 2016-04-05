@@ -142,7 +142,7 @@ def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
     # Create input directory, populate it, and get image metadata
     input_dir = os.path.join(work_dir, 'input')
     os.mkdir(input_dir)
-    
+
     if preprocess or not density or ext>0:
         # Create new input files
         for input_file in input_files:
@@ -161,8 +161,8 @@ def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
             basename = os.path.basename(input_file)
             basename = '_density'.join(os.path.splitext(basename))
             new_input_file = os.path.join(input_dir, basename)
-            hdu = astropy.io.fits.PrimaryHDU(data, header=hdr)
-            hdu.writeto(new_input_file)
+            hdu = astropy.io.fits.PrimaryHDU(data=data, header=hdr)
+            hdu.writeto(new_input_file, output_verify='ignore')
 
     else:
         # Symlink existing files
@@ -173,7 +173,7 @@ def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
 
     input_table = os.path.join(input_dir, 'input.tbl')
     montage.mImgtbl(input_dir, input_table, corners=True)
-    
+
     # Template header
     if header is None:
         template_header = os.path.join(work_dir, 'template.hdr')
@@ -194,7 +194,7 @@ def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
 
     reprojected_table = os.path.join(proj_dir, 'reprojected.tbl')
     montage.mImgtbl(proj_dir, reprojected_table, corners=True)
-    
+
     # Background matching
     if background_match:
         diff_dir = os.path.join(work_dir, 'differences')
@@ -269,7 +269,7 @@ def mosaic(input_files, mosaic_file, work_dir, ext=0, background_match=False,
 
         if not density:
             # Convert flux density into total flux
-            data *= area
+            data *= pixarea
 
         if postprocess:
             data, hdr = postprocess(data, hdr)
